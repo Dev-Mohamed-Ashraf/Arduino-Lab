@@ -3,6 +3,10 @@
   "compilerOptions": {
     "outDir": "./dist",
     "rootDir": "./src",
+    // Kept inside dist on purpose: nest-cli wipes dist before every build, so a
+    // build-info file stored anywhere else would claim files are up to date and
+    // leave the output half-emitted.
+    "tsBuildInfoFile": "./dist/.tsbuildinfo",
     "paths": {
       "@/*": ["./src/*"]
     }

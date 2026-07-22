@@ -16,6 +16,13 @@ export const nestConfig = tseslint.config(
       '@typescript-eslint/interface-name-prefix': 'off',
       '@typescript-eslint/explicit-module-boundary-types': 'off',
 
+      // Incompatible with dependency injection: a constructor parameter looks
+      // type-only to the linter, but `emitDecoratorMetadata` needs the runtime
+      // import to resolve the provider. Autofixing it silently breaks DI at
+      // startup, so the rule is off for the API. Type-only imports are still
+      // written with `import type` by hand where they are genuinely types.
+      '@typescript-eslint/consistent-type-imports': 'off',
+
       // Services must not swallow rejected promises.
       '@typescript-eslint/no-floating-promises': 'off',
     },
