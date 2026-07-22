@@ -1,0 +1,57 @@
+# Render blueprint for the NestJS API.
+# Import this repo at https://dashboard.render.com/blueprints and Render reads it.
+# Every value marked sync:false must be filled in the dashboard — never commit secrets.
+
+services:
+  - type: web
+    name: arduino-lab-api
+    runtime: node
+    region: frankfurt
+    plan: free
+    # Build from the monorepo root; corepack pins the pnpm version.
+    buildCommand: >-
+      corepack enable &&
+      pnpm install --frozen-lockfile &&
+      pnpm --filter @arduino-lab/api db:generate &&
+      pnpm --filter @arduino-lab/api build &&
+      pnpm --filter @arduino-lab/api db:deploy
+    startCommand: node apps/api/dist/main.js
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Render sets PORT itself; main.ts reads process.env.PORT.
+      - key: NODE_VERSION
+        value: "22"
+      - key: API_URL
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
+        sync: false
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: JWT_ACCESS_TTL
+        value: 15m
+      - key: JWT_REFRESH_TTL
+        value: 7d
+      - key: ALLOWED_EMAIL_DOMAINS
+        sync: false
+      - key: STUDENT_APP_URL
+        sync: false
+      - key: ADMIN_APP_URL
+        sync: false
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      - key: CLOUDINARY_UPLOAD_FOLDER
+        value: arduino-lab/id-cards
+      - key: RESEND_API_KEY
+        sync: false
+      - key: MAIL_FROM
+        sync: false
