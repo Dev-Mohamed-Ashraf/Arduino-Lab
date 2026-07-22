@@ -1,9 +1,9 @@
 ---
 id: 07
 title: Student App
-status: in-progress
+status: done
 started: 2026-07-22
-completed: -
+completed: 2026-07-23
 depends_on: [06]
 ---
 
@@ -81,3 +81,86 @@ Next.js 15 App Router · React 19 · TanStack Query v5 · react-hook-form + zod 
 - محاولة كمية أكبر من المتاح → ممنوعة في الواجهة **و** مرفوضة من السيرفر
 - قفل الصفحة في نص الويزارد وفتحها تاني → البيانات موجودة
 - `pnpm --filter @arduino-lab/student build` بينجح
+
+---
+
+## اللي اتنفّذ فعلاً — 2026-07-23
+
+### الملفات
+```
+app/            layout.tsx · providers.tsx · globals.css · page.tsx (الداشبورد)
+app/(auth)/     layout · login · register · verify-email · forgot-password · reset-password
+app/(app)/      booking/new · my-bookings · booking/[bookingNumber]
+components/     site-header · require-auth · my-bookings-list · booking-receipt
+components/auth/        auth-card · form-field
+components/dashboard/   slots-panel · components-panel
+components/booking-wizard/  booking-wizard · wizard-progress · steps · use-booking-draft
+                            step-group · step-members · step-id-card · step-project
+                            step-components · step-slot · step-review
+lib/            api · token-store · auth-context · upload · format
+```
+
+### انحرافات عن الخطة
+
+1. **صفحة الإيصال جوّه مجموعة `(app)` مش في الجذر.** الخطة حطّتها في الجذر، بس هي
+   محتاجة مصادقة زي باقي صفحات التطبيق. صفحة الطباعة هي اللي هتحتاج layout منفصل (خطة 09).
+
+2. **`@custom-variant` و `@import 'tailwindcss'` اتنقلوا لملف CSS بتاع التطبيق.**
+   كانوا في `packages/ui`. لما يكونوا في ملف مستورد، Tailwind بيعامله كـ stylesheet عادي
+   وبيطلّع الـ at-rules زي ما هي، وبعدين ضغط الـ CSS بيقع عليها. دول تعليمات نقطة دخول
+   ومكانها الصح هو ملف التطبيق.
+
+3. **التوكن: access في الذاكرة و refresh في `localStorage`.** الخطة قالت refresh في
+   httpOnly cookie. مش عملي هنا: الـ API على Render والواجهة على Vercel — دومينين
+   مختلفين، والكوكي عبر المواقع بيتحجب افتراضيًا في معظم المتصفحات. البديل: التوكن
+   القصير (15 دقيقة) بره التخزين تمامًا، والـ refresh بيتدوّر مع كل استخدام مع كشف
+   إعادة الاستخدام على السيرفر.
+
+4. **`publicApi` منفصل عن `api`.** الـ Server Component بيستخدم كلاينت من غير مخزن
+   توكنات — الرندر على السيرفر مشترك بين المستخدمين وما ينفعش يلتقط جلسة حد تاني.
+
+5. **مسح المسودّة في `sessionStorage` مش `localStorage`** — المسودّة تموت مع التبويب
+   وما تظهرش للشخص اللي بعده على جهاز معمل مشترك.
+
+### باجّين اتصادوا
+
+1. **`Button asChild` كان بيكسر كل صفحة فيها زرار-رابط.**
+   ```
+   Slot failed to slot onto its children.
+   Expected a single React element child or `Slottable`.
+   ```
+   الكومبوننت كان بيحقن الـ spinner جنب `children`، فـ Radix Slot بيستلم ولدين
+   وهو عايز واحد. دلوقتي `asChild` بيرندر ولد المستخدم من غير حقن.
+
+2. **`useSearchParams()` في `/login` من غير Suspense** كان بيفشّل بناء الإنتاج
+   (`prerender-error`). اتلفّ في `<Suspense>` زي `verify-email` و `reset-password`.
+
+3. **أسهم الويزارد**: حطّيت `.rtl-flip` على أسهم السابق/التالي بالغلط. في RTL
+   بداية السطر هي اليمين، فسهم "السابق" لليمين **صح أصلاً** — الـ flip كان هيعكسه غلط.
+
+### التحقق الفعلي
+
+كل الـ 8 مسارات رجّعت 200 من السيرفر الفعلي، والمحتوى العربي المتوقع موجود في كل واحدة.
+
+| الفحص | النتيجة |
+|---|---|
+| `<html lang="ar" dir="rtl">` | ✅ |
+| الفترات الأربعة و`0 / 5` والـ38 مكون في الداشبورد | ✅ |
+| **كلاسات اتجاهية فيزيائية (`ml-` `pl-` `text-left`…)** | **✅ صفر عبر كل المسارات** |
+| خصائص منطقية مستخدمة | 472 |
+| مدخلات `/register` بلا `<label>` مرتبطة | **0 من 6** |
+| مساحات لمس 44px (`h-11`/`size-11`) | 6 |
+| `aria-describedby` على الحقول | ✅ |
+| نقاط الاستجابة في الداشبورد | `sm`×57 · `md`×5 · `lg`×4 |
+| الجدول مخفي على الموبايل والكروت ظاهرة | ✅ |
+| أرقام غربية مصفوفة (`tabular-nums`) | 182 |
+
+```
+pnpm --filter @arduino-lab/student typecheck  ✅
+pnpm --filter @arduino-lab/student lint       ✅
+pnpm --filter @arduino-lab/student build      ✅ 11 مسار
+```
+
+### ملاحظة
+`/booking/[bookingNumber]/print` مربوط من صفحة الإيصال و"حجوزاتي" لكنه **لسه ما اتعملش** —
+ده نطاق خطة 09.

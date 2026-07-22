@@ -1,8 +1,8 @@
 ---
 id: 08
 title: Admin App
-status: planned
-started: -
+status: in-progress
+started: 2026-07-23
 completed: -
 depends_on: [06]
 ---

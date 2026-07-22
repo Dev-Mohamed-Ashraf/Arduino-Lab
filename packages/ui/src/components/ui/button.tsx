@@ -52,19 +52,24 @@ function Button({
   children,
   ...props
 }: ButtonProps) {
-  const Comp = asChild ? Slot : 'button';
+  const sharedProps = {
+    'data-slot': 'button',
+    className: cn(buttonVariants({ variant, size, className })),
+    'aria-busy': isLoading || undefined,
+    ...props,
+  };
+
+  // Radix Slot accepts exactly one element child, so the spinner cannot be
+  // injected alongside it — `asChild` renders the caller's element untouched.
+  if (asChild) {
+    return <Slot {...sharedProps}>{children}</Slot>;
+  }
 
   return (
-    <Comp
-      data-slot="button"
-      className={cn(buttonVariants({ variant, size, className }))}
-      disabled={disabled ?? isLoading}
-      aria-busy={isLoading || undefined}
-      {...props}
-    >
+    <button {...sharedProps} disabled={disabled ?? isLoading}>
       {isLoading ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
       {children}
-    </Comp>
+    </button>
   );
 }
 

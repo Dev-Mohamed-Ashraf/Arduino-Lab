@@ -1,10 +1,10 @@
-@import 'tailwindcss';
-@import 'tw-animate-css';
-
-/* Both apps live under packages/, so their own @source directives cannot see
-   this package. Each app re-declares the source path; see apps/*/app/globals.css */
-
-@custom-variant dark (&:is(.dark *));
+/* Shared design tokens and base layer.
+ *
+ * Deliberately contains no `@import "tailwindcss"` and no `@custom-variant`:
+ * those are entry-point directives and belong in each app's own globals.css.
+ * Leaving them here makes Tailwind treat this as a plain stylesheet and emit the
+ * at-rules verbatim, which then fails CSS minification.
+ * See apps/<app>/app/globals.css. */
 
 /* ─────────────────────────────────────────────────────────────
    Design tokens
