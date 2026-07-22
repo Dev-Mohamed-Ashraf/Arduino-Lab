@@ -87,6 +87,9 @@ importers:
       '@types/express':
         specifier: ^5.0.0
         version: 5.0.6
+      '@types/jsonwebtoken':
+        specifier: ^9.0.10
+        version: 9.0.10
       '@types/node':
         specifier: ^22.10.7
         version: 22.20.1
@@ -99,6 +102,9 @@ importers:
       eslint:
         specifier: ^9.18.0
         version: 9.39.5(jiti@2.7.0)
+      jsonwebtoken:
+        specifier: ^9.0.3
+        version: 9.0.3
       prisma:
         specifier: ^6.2.1
         version: 6.19.3(typescript@5.9.3)

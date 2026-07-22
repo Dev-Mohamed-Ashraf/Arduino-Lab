@@ -1,14 +1,16 @@
 import { Module } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
-import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerModule } from '@nestjs/throttler';
 
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
+import { UserThrottlerGuard } from './common/guards/user-throttler.guard';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { PrismaModule } from './common/prisma/prisma.module';
 import { AppConfigModule } from './config/config.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { BookingsModule } from './modules/bookings/bookings.module';
 import { ComponentsModule } from './modules/components/components.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { HealthModule } from './modules/health/health.module';
@@ -27,14 +29,16 @@ import { UsersModule } from './modules/users/users.module';
     UsersModule,
     ComponentsModule,
     SlotsModule,
+    BookingsModule,
     DashboardModule,
     HealthModule,
   ],
   providers: [
-    // Order matters: throttling runs first, then authentication. Route-level
-    // RolesGuard is applied per controller so anonymous routes stay cheap.
-    { provide: APP_GUARD, useClass: ThrottlerGuard },
+    // Authentication runs first so the throttler can key on the user id rather
+    // than the shared lab IP. On anonymous routes JwtAuthGuard returns without
+    // touching the database, so this ordering costs nothing.
     { provide: APP_GUARD, useClass: JwtAuthGuard },
+    { provide: APP_GUARD, useClass: UserThrottlerGuard },
     { provide: APP_FILTER, useClass: AllExceptionsFilter },
     { provide: APP_INTERCEPTOR, useClass: LoggingInterceptor },
   ],
