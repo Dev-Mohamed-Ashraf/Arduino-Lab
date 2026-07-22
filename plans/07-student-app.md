@@ -1,8 +1,8 @@
 ---
 id: 07
 title: Student App
-status: planned
-started: -
+status: in-progress
+started: 2026-07-22
 completed: -
 depends_on: [06]
 ---

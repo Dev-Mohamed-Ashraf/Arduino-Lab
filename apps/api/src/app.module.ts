@@ -15,7 +15,9 @@ import { ComponentsModule } from './modules/components/components.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { HealthModule } from './modules/health/health.module';
 import { MailModule } from './modules/mail/mail.module';
+import { ReportsModule } from './modules/reports/reports.module';
 import { SlotsModule } from './modules/slots/slots.module';
+import { UploadsModule } from './modules/uploads/uploads.module';
 import { UsersModule } from './modules/users/users.module';
 
 @Module({
@@ -31,6 +33,8 @@ import { UsersModule } from './modules/users/users.module';
     SlotsModule,
     BookingsModule,
     DashboardModule,
+    UploadsModule,
+    ReportsModule,
     HealthModule,
   ],
   providers: [
