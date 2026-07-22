@@ -9,9 +9,12 @@ services:
     region: frankfurt
     plan: free
     # Build from the monorepo root; corepack pins the pnpm version.
+    # --prod=false forces devDependencies even though NODE_ENV=production is set
+    # below: prisma, the Nest CLI and typescript are all devDependencies needed
+    # to build. Production runs the compiled dist, so runtime stays lean.
     buildCommand: >-
       corepack enable &&
-      pnpm install --frozen-lockfile &&
+      pnpm install --frozen-lockfile --prod=false &&
       pnpm --filter @arduino-lab/api db:generate &&
       pnpm --filter @arduino-lab/api build &&
       pnpm --filter @arduino-lab/api db:deploy
