@@ -1,8 +1,8 @@
 ---
 id: 03
 title: API Core + Auth
-status: planned
-started: -
+status: in-progress
+started: 2026-07-22
 completed: -
 depends_on: [01, 02]
 ---

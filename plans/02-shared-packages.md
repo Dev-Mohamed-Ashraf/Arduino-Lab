@@ -1,9 +1,9 @@
 ---
 id: 02
 title: Shared Packages
-status: in-progress
+status: done
 started: 2026-07-22
-completed: -
+completed: 2026-07-22
 depends_on: [00]
 ---
 
@@ -69,3 +69,58 @@ src/
 - `pnpm --filter @arduino-lab/ui build` بينجح
 - استيراد نوع من `contracts` في تطبيق Next.js شغّال مع IntelliSense
 - كل كومبوننتس `ui` بتترندر مقلوبة صح جوه `dir="rtl"`
+
+---
+
+## اللي اتنفّذ فعلاً — 2026-07-22
+
+### `packages/contracts`
+`constants.ts` · `errors.ts` (48 كود خطأ + رسالة عربية لكل واحد) ·
+8 ملفات schema (`common` `auth` `user` `component` `slot` `booking` `dashboard` `report` `upload`) ·
+`client/api-error.ts` · `client/http-client.ts` · `client/endpoints.ts`
+
+### `packages/ui`
+`styles/globals.css` (Tailwind v4 `@theme inline` + tokens بـ oklch + light/dark) ·
+`lib/cn.ts` ·
+18 primitive: `alert` `badge` `button` `card` `checkbox` `dialog` `dropdown-menu` `input` `label`
+`popover` `progress` `select` `separator` `sheet` `skeleton` `sonner` `switch` `table` `tabs`
+`textarea` `theme-provider` `tooltip` ·
+5 كومبوننت مشروع: `stat-card` `slot-card` `stock-badge` `states` (empty/error) `page-header`
+
+### انحرافات عن الخطة
+
+1. **`@arduino-lab/ui` مش بيتبني.** بيشحن TypeScript خام والتطبيقات بتحوّله بـ
+   `transpilePackages` — النمط المعتمد في Turborepo. أبسط، ومفيش خطوة build ولا مشاكل CSS.
+
+2. **`packages/eslint-config/react.js` اتضافت.** الخطة كان فيها `base` و `next` و `nest` بس.
+   بس `packages/ui` مش تطبيق Next، وplugin بتاع Next كان بيحذّر عن `pages/` مش موجودة.
+   دلوقتي: `base` ← `react` (فيه قاعدة RTL) ← `next` (بيزوّد plugin بتاع Next).
+
+3. **`rootDir` اتشال من `packages/tsconfig/react-library.json`.**
+   المسارات النسبية في `extends` بتتحل نسبةً لمكان الملف الأصلي، فـ `rootDir: "src"`
+   كان بيشاور على `packages/tsconfig/src`. الحزمة اللي بتستخدمه هي اللي بتحدده دلوقتي.
+
+4. **`lib: ["ES2023", "DOM"]` في `contracts`** — الـ HTTP client بيستخدم
+   `fetch` و `URL` و `AbortSignal`.
+
+### تفاصيل RTL اتظبطت يدويًا
+
+CSS transforms **فيزيائية** ومش بتتقلب مع `dir`. اتصلّحت في مكانين:
+
+| الكومبوننت | المشكلة | الحل |
+|---|---|---|
+| `Progress` | `translateX` كان هيملا الشريط من الشمال في RTL | الملء بـ `width` — block child بيبدأ من inline-start في الاتجاهين |
+| `Switch` | الإبهام كان هيتحرك في الاتجاه الغلط | `ltr:translate-x-5` / `rtl:-translate-x-5` |
+| `Sheet` | `slide-in-from-end` مش موجود في tw-animate-css | الموضع منطقي (`inset-inline`)، والأنيميشن بـ `ltr:`/`rtl:` variants |
+
+كمان `.rtl-flip` utility للأيقونات الاتجاهية، و `font-variant-numeric: lining-nums tabular-nums`
+عشان الأرقام تفضل غربية ومحاذية في الجداول.
+
+### التحقق الفعلي
+```
+pnpm --filter @arduino-lab/contracts build      ✅
+pnpm --filter @arduino-lab/contracts lint       ✅
+pnpm --filter @arduino-lab/ui typecheck         ✅
+pnpm --filter @arduino-lab/ui lint              ✅
+```
+التحقق البصري من RTL بيتم في خطة 07 لما يبقى فيه صفحة تترندر.
