@@ -16,8 +16,8 @@
 | # | الخطة | الحالة | بدأت | خلصت |
 |---|---|---|---|---|
 | 00 | [Foundation — هيكل الـ monorepo](./00-foundation.md) | ✅ done | 2026-07-22 | 2026-07-22 |
-| 01 | [Database Schema](./01-database-schema.md) | 🔄 in-progress | 2026-07-22 | - |
-| 02 | [Shared Packages](./02-shared-packages.md) | ⬜ planned | - | - |
+| 01 | [Database Schema](./01-database-schema.md) | ✅ done | 2026-07-22 | 2026-07-22 |
+| 02 | [Shared Packages](./02-shared-packages.md) | 🔄 in-progress | 2026-07-22 | - |
 | 03 | [API Core + Auth](./03-api-core-auth.md) | ⬜ planned | - | - |
 | 04 | [API Components + Slots](./04-api-components-slots.md) | ⬜ planned | - | - |
 | 05 | [API Bookings](./05-api-bookings.md) | ⬜ planned | - | - |
