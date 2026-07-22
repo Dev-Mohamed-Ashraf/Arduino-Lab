@@ -1,9 +1,9 @@
 ---
 id: 11
 title: Hardening + Tests
-status: planned
-started: -
-completed: -
+status: done
+started: 2026-07-23
+completed: 2026-07-23
 depends_on: [10]
 ---
 
@@ -90,3 +90,79 @@ depends_on: [10]
 - `pnpm test:e2e` — **خصوصاً اختباري التزامن**
 - فحص يدوي للسيناريوهات السبعة في قسم التحقق بتاع الخطة الأصلية
 - Lighthouse على الموقعين: Performance ≥ 90 · Accessibility ≥ 95
+
+---
+
+## اللي اتنفّذ فعلاً — 2026-07-23
+
+### الملفات
+```
+apps/api/vitest.config.ts · vitest.e2e.config.ts
+apps/api/test/setup-app.ts · bookings-concurrency.e2e-spec.ts · auth.e2e-spec.ts
+apps/api/src/**/*.spec.ts   (token.service · component.mapper · csv · dates)
+packages/contracts/src/schemas/booking.schema.spec.ts
+```
+
+### التشديد الأمني — كان معمول أصلاً في خطط سابقة
+| البند | مكانه |
+|---|---|
+| Helmet + CSP | `main.ts` (خطة 03) |
+| Rate limiting عام 100/دقيقة | `ThrottlerModule` (خطة 03) |
+| `/auth/*` 5/دقيقة | `@Throttle` على الكونترولر (خطة 03) |
+| `POST /bookings` 30/ساعة **لكل مستخدم** | `UserThrottlerGuard` (خطة 05) |
+| حجم الطلب 1MB | `main.ts` bodyParser |
+| تسريب أخطاء Prisma | `AllExceptionsFilter` (خطة 03) |
+| تعداد الحسابات | ردود موحّدة (خطة 03) |
+| SQL injection | Prisma parameterized + `$queryRaw` tagged templates بس |
+| **فحص أسرار git** | ✅ `.env` متجاهل · صفر مفاتيح حقيقية في ملفات متتبّعة |
+
+### الاختبارات — 38 اختبار
+
+**وحدة (32):**
+- `token.service` — `parseDuration` (وحدات + مدخل خاطئ) · `hashToken` (حتمي · SHA-256 · ما بيرجّعش الخام)
+- `component.mapper` — المتاح المشتق · حالات `out`/`low`/`available` عند الحدود
+- `csv` — BOM · CRLF · تنصيص الفاصلة · تهريب الاقتباس · **حقن الصيغ (`=`/`+`/`-`/`@`)** · الأسماء العربية
+- `dates` — round-trip بدون انزياح يوم
+- `booking.schema` — 0/6/7 أعضاء · كمية سالبة · مكون مكرر · بدون مكونات · تاريخ خاطئ
+
+**e2e على داتابيز حقيقية (6) — الأهم:**
+```
+✓ 10 طلبات متوازية لنفس الفترة → 5 بالظبط ينجحوا · 5 → 409 · الصفوف = السعة   (24.6s)
+✓ آخر قطعة مخزون · 6 متنافسين → واحد بس يكسب · reservedQuantity ≤ total       (10s)
+✓ مكون متاح + مكون ناقص → 409 · المتاح ما اتخصمش · مفيش صف حجز                 (2.5s)
+✓ login قبل التأكيد → 403 · بعده → 200
+✓ تدوير refresh · replay القديم → 401 · كشف إعادة الاستخدام يلغي العائلة كلها
+```
+
+### باجّات الإعداد اللي اتصادت
+
+1. **DI بيقع تحت Vitest.** الـ esbuild الافتراضي **مبيصدرش decorator metadata**،
+   فـ NestJS ما بيعرفش أنواع بارامترات الكونستركتور و `AppConfigService` بيرجع
+   `undefined`. الحل: `unplugin-swc` بيعيد إصدار الـ metadata + `reflect-metadata`
+   في `setupFiles`.
+2. **`ValidationPipe` بتحمّل `class-validator`** اللي مش متسطّب (المشروع zod). اتشالت
+   من إعداد الاختبار — التحقق بيتم عبر `ZodValidationPipe` على مستوى الراوت.
+3. **`ALLOWED_EMAIL_DOMAINS` cached.** تعيينها في `beforeAll` جه متأخر لأن
+   `AppConfigService` بيخزّن البيئة وقت الإقلاع. اتنقلت لـ `vitest.e2e.config.ts`
+   قبل ما التطبيق يقوم.
+4. **BOM حرفي في regex** بملف اختبار CSV → `no-irregular-whitespace`. اتحوّل لـ
+   `new RegExp('^\\uFEFF')`.
+
+### إعدادات الاختبار
+- `unplugin-swc` + `@swc/core` (decorator metadata) · `jsonwebtoken` (سك توكن مباشر)
+- e2e: `fileParallelism: false` + `singleFork` — داتابيز واحدة، صفوف مشتركة
+- مهل 60 ثانية للـ e2e — الحجوزات بتصطف على قفل الفترة وNeon بعيد
+- استثناء ملفات الاختبار من `max-lines`/`no-console` في قاعدة ESLint الأساسية
+
+### التحقق النهائي
+```
+pnpm --filter @arduino-lab/api test          ✅ 23
+pnpm --filter @arduino-lab/contracts test    ✅ 9
+pnpm --filter @arduino-lab/api test:e2e      ✅ 6 (على Neon)
+pnpm check (lint + typecheck + build)        ✅ 7/7 · 7/7 · 4/4 — صفر تحذيرات
+git secret scan                              ✅ نضيف
+```
+
+### متبقٍ (محتاج بيئة/متصفح)
+- Lighthouse على الموقعين — محتاج متصفح
+- فحص رفع الصور الفعلي — محتاج مفاتيح Cloudinary (البند المؤجّل من خطة 06)

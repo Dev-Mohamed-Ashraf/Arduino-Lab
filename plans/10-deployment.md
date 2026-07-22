@@ -1,9 +1,10 @@
 ---
 id: 10
 title: Deployment
-status: in-progress
+status: blocked
 started: 2026-07-23
 completed: -
+blocked_on: النشر الفعلي محتاج حسابات المستخدم (GitHub · Cloudinary · Resend) + موافقة على git push. كل ملفات الإعداد جاهزة.
 depends_on: [07, 08, 09]
 ---
 

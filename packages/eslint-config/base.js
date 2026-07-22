@@ -45,6 +45,17 @@ export const baseConfig = tseslint.config(
       'object-shorthand': 'error',
     },
   },
+  {
+    // Test files are naturally long — a describe block groups many cases, and a
+    // console.log is a legitimate debugging aid there.
+    files: ['**/*.spec.ts', '**/*.test.ts', '**/*.e2e-spec.ts', '**/test/**'],
+    rules: {
+      'max-lines': 'off',
+      'max-lines-per-function': 'off',
+      'no-console': 'off',
+      '@typescript-eslint/no-non-null-assertion': 'off',
+    },
+  },
   prettier,
 );
 
