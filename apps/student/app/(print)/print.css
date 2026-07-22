@@ -1,0 +1,50 @@
+/* Receipt print styles.
+ *
+ * The receipt renders on screen too, so most rules only take effect inside the
+ * @media print block. Colours are printed as black on white rather than relying
+ * on background fills, which browsers omit from print by default. */
+
+@page {
+  size: A4;
+  margin: 14mm;
+}
+
+.print-body {
+  background: #fff;
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  /* Don't append the URL after every link, which browsers do by default. */
+  a[href]::after {
+    content: none !important;
+  }
+
+  /* Keep a row and the signature block from splitting across a page break. */
+  table {
+    page-break-inside: auto;
+  }
+
+  tr,
+  .avoid-break {
+    page-break-inside: avoid;
+  }
+
+  /* Repeat the table header on every page the components table spills onto. */
+  thead {
+    display: table-header-group;
+  }
+
+  .page-break {
+    page-break-before: always;
+  }
+}

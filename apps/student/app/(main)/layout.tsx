@@ -2,8 +2,8 @@ import type { Metadata, Viewport } from 'next';
 import { IBM_Plex_Sans_Arabic } from 'next/font/google';
 
 import { SiteHeader } from '@/components/site-header';
-import { Providers } from './providers';
-import './globals.css';
+import { Providers } from '@/app/providers';
+import '@/app/globals.css';
 
 const arabic = IBM_Plex_Sans_Arabic({
   subsets: ['arabic', 'latin'],
@@ -29,7 +29,14 @@ export const viewport: Viewport = {
   ],
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+/**
+ * Root layout for every screen that carries the site chrome.
+ *
+ * The print receipt lives under the sibling (print) group, which has its own
+ * root layout with no header or footer — see plans/09-print-export.md. Having
+ * two root layouts is why there is no shared app/layout.tsx.
+ */
+export default function MainLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ar" dir="rtl" suppressHydrationWarning className={arabic.variable}>
       <body>

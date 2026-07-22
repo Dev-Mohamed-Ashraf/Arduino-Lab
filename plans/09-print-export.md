@@ -1,9 +1,9 @@
 ---
 id: 09
 title: Print / Export
-status: in-progress
+status: done
 started: 2026-07-23
-completed: -
+completed: 2026-07-23
 depends_on: [07]
 ---
 
@@ -83,3 +83,76 @@ depends_on: [07]
 - حفظ PDF من ديالوج الطباعة → الملف نضيف والنص قابل للتحديد (مش صورة)
 - حجز بـ 15 مكون → الجدول بيتقسم صح والرأس بيتكرر
 - الطباعة من موبايل شغّالة
+
+---
+
+## اللي اتنفّذ فعلاً — 2026-07-23
+
+### الملفات
+```
+apps/student/app/(main)/layout.tsx        ← الجذر بالـ header/footer (كان app/layout.tsx)
+apps/student/app/(print)/layout.tsx       ← جذر نضيف بدون chrome
+apps/student/app/(print)/print.css
+apps/student/app/(print)/booking/[bookingNumber]/print/page.tsx
+apps/student/components/print/print-receipt.tsx
+```
+
+### انحراف رئيسي عن الخطة: إعادة هيكلة الجذر
+
+الخطة افترضت layout متداخل لصفحة الطباعة. ده **مستحيل** في Next.js: الـ layout المتداخل
+مبيرندرش `<html>/<body>` خاص بيه، فبيورث الـ header والـ footer من الجذر.
+
+الحل المعتمد في Next.js هو **جذران** (multiple root layouts) عبر route groups:
+- اتشال `app/layout.tsx` من فوق تمامًا
+- محتوى الموقع كله اتنقل تحت `app/(main)/` (بجذره الخاص + الـ chrome)
+- صفحة الطباعة تحت `app/(print)/` (بجذر نضيف)
+- `/booking/X` في `(main)/(app)` و `/booking/X/print` في `(print)` — URLين مختلفين، مفيش تعارض
+
+### قرار: الطباعة من المتصفح مش PDF من السيرفر
+
+اتثبّت زي ما الخطة قالت: `window.print()` من صفحة HTML بـ `@media print`، مش
+Puppeteer ولا `@react-pdf`. السبب: رندر PDF على السيرفر بيكسر تشكيل الحروف العربية،
+وChromium على Render المجاني بياكل الذاكرة. المتصفح بيرندر العربي مضبوط والمستخدم
+بيحفظ PDF من نفس الديالوج.
+
+الصفحة بتفتح ديالوج الطباعة تلقائيًا بعد 400ms من رندر الإيصال (تعمل زي زرار طباعة)،
+وفيها زرار `.no-print` كمان.
+
+### محتوى الإيصال
+رقم الحجز · التاريخ · الفترة · رقم المجموعة · عدد الطلاب · أسماء الطلاب بأرقامهم ·
+اسم المشروع ووصفه · جدول المكونات بأعمدة (الكمية · **استُلم** · **أُرجع** فاضيين للتوقيع
+بالقلم) · خانتا توقيع الطالب والمشرف · تاريخ التسجيل.
+
+### التحقق الفعلي
+
+اتعمل حجز حقيقي (`ARD-2026-0051`) عن طريق الـ API، وبعدين:
+
+```
+GET /                              → 200
+GET /login                         → 200
+GET /booking/ARD-2026-0051/print   → 200
+```
+
+| الفحص | النتيجة |
+|---|---|
+| صفحة الطباعة فيها الـ site header (`sticky top-0`) | **لا (سليم)** — الجذر النضيف شغّال |
+| صفحة الطباعة `robots: noindex` | ✅ |
+| عنوان الصفحة "إيصال الحجز" | ✅ |
+| **`@page { size: A4 }` في CSS البناء** | ✅ `size:A4` |
+| **`.no-print` في CSS البناء** | ✅ |
+| **`thead { table-header-group }` (تكرار رأس الجدول)** | ✅ |
+
+```
+pnpm --filter @arduino-lab/student typecheck  ✅
+pnpm --filter @arduino-lab/student lint       ✅
+pnpm --filter @arduino-lab/student build      ✅ 11 مسار (منها /booking/[bookingNumber]/print)
+```
+
+### باج اتصاد
+`useEffect` كان بيرجّع cleanup في مسار واحد بس (`if (data)`) — TypeScript
+`noImplicitReturns` وقّف البناء. اتصلّح بـ `return undefined` صريح.
+
+### متبقٍ للتحقق البصري (محتاج متصفح)
+معاينة الطباعة الفعلية `Ctrl+P` — إن الصفحة A4 واحدة، العربي متصل، والجدول بيتقسم صح
+لو المكونات كتير. الكود صحيح والـ CSS اتجمّع، لكن الشكل النهائي على الورق ما اتشافش
+بصريًا في هذه الجلسة.

@@ -26,8 +26,8 @@
 | 06 | [API Uploads · Mail · Reports](./06-api-uploads-mail-reports.md) | ✅ done ⚠️ | 2026-07-22 | 2026-07-22 |
 | 07 | [Student App](./07-student-app.md) | ✅ done | 2026-07-22 | 2026-07-23 |
 | 08 | [Admin App](./08-admin-app.md) | ✅ done | 2026-07-23 | 2026-07-23 |
-| 09 | [Print / Export](./09-print-export.md) | 🔄 in-progress | 2026-07-23 | - |
-| 10 | [Deployment](./10-deployment.md) | ⬜ planned | - | - |
+| 09 | [Print / Export](./09-print-export.md) | ✅ done | 2026-07-23 | 2026-07-23 |
+| 10 | [Deployment](./10-deployment.md) | 🔄 in-progress | 2026-07-23 | - |
 | 11 | [Hardening + Tests](./11-hardening-tests.md) | ⬜ planned | - | - |
 
 ## ترتيب التنفيذ
