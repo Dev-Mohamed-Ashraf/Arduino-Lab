@@ -7,9 +7,13 @@ import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { PrismaModule } from './common/prisma/prisma.module';
 import { AppConfigModule } from './config/config.module';
+import { AuditModule } from './modules/audit/audit.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { ComponentsModule } from './modules/components/components.module';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { HealthModule } from './modules/health/health.module';
 import { MailModule } from './modules/mail/mail.module';
+import { SlotsModule } from './modules/slots/slots.module';
 import { UsersModule } from './modules/users/users.module';
 
 @Module({
@@ -17,9 +21,13 @@ import { UsersModule } from './modules/users/users.module';
     AppConfigModule,
     PrismaModule,
     MailModule,
+    AuditModule,
     ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: 100 }]),
     AuthModule,
     UsersModule,
+    ComponentsModule,
+    SlotsModule,
+    DashboardModule,
     HealthModule,
   ],
   providers: [

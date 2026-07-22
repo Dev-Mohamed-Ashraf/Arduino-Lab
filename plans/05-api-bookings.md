@@ -1,8 +1,8 @@
 ---
 id: 05
 title: API Bookings
-status: planned
-started: -
+status: in-progress
+started: 2026-07-22
 completed: -
 depends_on: [04]
 ---

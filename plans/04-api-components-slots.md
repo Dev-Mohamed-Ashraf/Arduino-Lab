@@ -1,9 +1,9 @@
 ---
 id: 04
 title: API Components + Slots
-status: planned
-started: -
-completed: -
+status: done
+started: 2026-07-22
+completed: 2026-07-22
 depends_on: [03]
 ---
 
@@ -63,3 +63,61 @@ depends_on: [03]
 - تقليل `totalQuantity` تحت المحجوز → 409
 - تقليل `capacity` تحت عدد المحجوز → 409
 - `GET /slots/availability?date=2026-08-01` بيرجّع أرقام صح
+
+---
+
+## اللي اتنفّذ فعلاً — 2026-07-22
+
+### الملفات
+```
+src/modules/audit/       audit.service.ts · audit.module.ts
+src/modules/components/  component.mapper.ts · components.service.ts
+                         components.controller.ts · components.module.ts
+src/modules/slots/       slots.service.ts · slots.controller.ts · slots.module.ts
+src/modules/dashboard/   dashboard.service.ts · dashboard.controller.ts · dashboard.module.ts
+```
+
+### انحرافات عن الخطة
+
+1. **`AuditModule` اتعمل هنا بدل خطة 05.** الخطة كانت بتقول إن سجل التدقيق مع الحجوزات،
+   بس تعديلات الأدمن على المكونات والفترات محتاجة تتسجّل من دلوقتي. الموديول global.
+
+2. **تسجيل التدقيق ما بيوقعش العملية أبدًا.** لو الإدراج في `AuditLog` فشل، التغيير اللي
+   الأدمن عمله بيفضل ناجح والفشل بيتسجّل في اللوج. سجل التدقيق مش أهم من العملية نفسها.
+
+3. **الحذف بيتحوّل لتعطيل لو فيه تاريخ.** الخطة قالت "soft delete". التنفيذ بيفرّق:
+   - فيه كمية محجوزة حاليًا → **409** (لا حذف ولا تعطيل)
+   - مربوط بحجوزات سابقة → **تعطيل** (`{ deleted: false }`)
+   - مفيش أي ارتباط → **حذف فعلي** (`{ deleted: true }`)
+   حذف مكون ظاهر في حجز قديم كان هيمسح إيه اللي المجموعة استلمته فعلًا.
+
+4. **فلترة `status` بتتم في الذاكرة مش في SQL.** حالة التوفر قيمة مشتقة من نسبة
+   `LOW_STOCK_THRESHOLD_RATIO`؛ تنفيذها في SQL كان معناه تكرار قاعدة العتبة في مكانين.
+
+5. **فحص تقليل السعة بيستخدم أكتر يوم مزدحم.** السعة لكل فترة **لكل يوم**، فالحد الأدنى
+   المسموح هو أكبر عدد مجموعات محجوز في يوم واحد قادم، مش الإجمالي.
+
+6. **`GET /components/:id` بيرجّع المعطّل كمان** — لوحة الأدمن محتاجة تعرضه.
+
+### التحقق الفعلي
+
+سكربت فحص اتشغّل على السيرفر والداتابيز الحقيقية، **34 فحص كلهم عدّوا**:
+
+| المجموعة | الأمثلة |
+|---|---|
+| Dashboard | عام · 4 فترات · `0/5` · 38 مكون · الملخص متسق · التاريخ بتوقيت القاهرة |
+| Slots | مرتّبة · مجهول ما يقدرش يعدّل · إغلاق يمنع الحجز · `capacity=0` مرفوض · patch فاضي مرفوض |
+| Components | ترقيم · المتاح مشتق · بحث · اسم مكرر → 409 · `low` عند 5/25 · `out` عند 0 |
+| القيود | تقليل الإجمالي تحت المحجوز → 409 · الحذف والكمية محجوزة → 409 |
+| Bulk | الأسماء الموجودة اتتخطّت (`created: 1, skipped: 1`) |
+| الحذف | مكون بدون تاريخ اتحذف فعليًا · بعده 404 |
+| Audit | تعديلات المكونات والفترات اتسجّلت |
+
+```
+pnpm --filter @arduino-lab/api build      ✅
+pnpm --filter @arduino-lab/api lint       ✅
+pnpm --filter @arduino-lab/api typecheck  ✅
+```
+
+`ComponentsService.update` كان تعقيده 16 (الحد 12) بسبب نمط الـ conditional spread —
+اتفكّك لدالة `toUpdateData` مستقلة. السكربت اتمسح بعد التحقق.
