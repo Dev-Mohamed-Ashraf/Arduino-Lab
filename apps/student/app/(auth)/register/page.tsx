@@ -11,7 +11,7 @@ import { useForm } from 'react-hook-form';
 import { AuthCard } from '@/components/auth/auth-card';
 import { FormField } from '@/components/auth/form-field';
 import { api } from '@/lib/api';
-import { toErrorMessage } from '@/lib/auth-context';
+import { toErrorMessage } from '@arduino-lab/web';
 
 export default function RegisterPage() {
   const [formError, setFormError] = React.useState<string | null>(null);

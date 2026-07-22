@@ -1,3 +1,4 @@
+import type { AuditLogEntry, ListAuditQuery } from '../schemas/audit.schema';
 import type { Paginated } from '../schemas/common.schema';
 import type {
   AuthTokens,
@@ -92,6 +93,11 @@ const userEndpoints = (http: HttpClient) => ({
   updateProfile: (input: UpdateProfileInput) => http.patch<CurrentUser>('/users/me', input),
 });
 
+const auditEndpoints = (http: HttpClient) => ({
+  list: (query: Partial<ListAuditQuery> = {}) =>
+    http.get<Paginated<AuditLogEntry>>('/audit', { query }),
+});
+
 const uploadEndpoints = (http: HttpClient) => ({
   signature: () => http.post<UploadSignature>('/uploads/signature'),
   remove: (publicId: string) => http.delete<void>(`/uploads/${encodeURIComponent(publicId)}`),
@@ -127,6 +133,7 @@ export function createApi(http: HttpClient) {
     users: userEndpoints(http),
     uploads: uploadEndpoints(http),
     reports: reportEndpoints(http),
+    audit: auditEndpoints(http),
   };
 }
 

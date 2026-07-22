@@ -8,7 +8,7 @@ import * as React from 'react';
 import { useFormContext } from 'react-hook-form';
 
 import { api } from '@/lib/api';
-import { addDays, formatLongDate, todayIso } from '@/lib/format';
+import { addDays, formatLongDate, todayIso } from '@arduino-lab/web';
 
 /** Bookings open for the next four weeks. */
 const BOOKING_HORIZON_DAYS = 28;

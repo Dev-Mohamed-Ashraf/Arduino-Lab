@@ -10,6 +10,7 @@ export * from './schemas/booking.schema';
 export * from './schemas/dashboard.schema';
 export * from './schemas/report.schema';
 export * from './schemas/upload.schema';
+export * from './schemas/audit.schema';
 
 export * from './client/api-error';
 export * from './client/http-client';

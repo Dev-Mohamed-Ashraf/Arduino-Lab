@@ -1,0 +1,15 @@
+{
+  "extends": "@arduino-lab/tsconfig/react-library.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "declaration": false,
+    "declarationMap": false,
+    "rootDir": "src",
+    "jsx": "preserve",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "types": ["react"]
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules"]
+}

@@ -1,11 +1,10 @@
 'use client';
 
-import { ApiError, type CurrentUser, type LoginInput } from '@arduino-lab/contracts';
+import { ApiError, type CurrentUser, type LoginInput, type TokenStore } from '@arduino-lab/contracts';
 import { useRouter } from 'next/navigation';
 import * as React from 'react';
 
-import { api, onSessionExpired } from './api';
-import { hasStoredSession, tokenStore } from './token-store';
+import type { AppApi } from './create-app-api';
 
 interface AuthContextValue {
   user: CurrentUser | null;
@@ -18,62 +17,79 @@ interface AuthContextValue {
 
 const AuthContext = React.createContext<AuthContextValue | null>(null);
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+export interface AuthProviderProps {
+  children: React.ReactNode;
+  appApi: AppApi;
+  tokenStore: TokenStore & { hasStoredSession: () => boolean };
+  /** Where to send the user when their session ends. */
+  loginPath: string;
+  /** Where to send the user after an explicit logout. */
+  logoutPath: string;
+}
+
+export function AuthProvider({
+  children,
+  appApi,
+  tokenStore,
+  loginPath,
+  logoutPath,
+}: AuthProviderProps) {
   const router = useRouter();
   const [user, setUser] = React.useState<CurrentUser | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
 
   const loadUser = React.useCallback(async () => {
     try {
-      setUser(await api.auth.me());
+      setUser(await appApi.api.auth.me());
     } catch {
       tokenStore.clear();
       setUser(null);
     }
-  }, []);
+  }, [appApi, tokenStore]);
 
   // On first paint the access token is always missing — it lives in memory and
-  // the page has just reloaded. A stored refresh token means the session may be
-  // recoverable, and the HTTP client will rotate it on this first 401.
+  // the page has just loaded. A stored refresh token means the session may be
+  // recoverable, and the HTTP client rotates it on this first 401.
   React.useEffect(() => {
-    if (!hasStoredSession()) {
+    if (!tokenStore.hasStoredSession()) {
       setIsLoading(false);
       return;
     }
 
     void loadUser().finally(() => setIsLoading(false));
-  }, [loadUser]);
+  }, [loadUser, tokenStore]);
 
   React.useEffect(
     () =>
-      onSessionExpired(() => {
+      appApi.onSessionExpired(() => {
         setUser(null);
-        router.push('/login');
+        router.push(loginPath);
       }),
-    [router],
+    [appApi, router, loginPath],
   );
 
-  const login = React.useCallback(async (input: LoginInput) => {
-    const tokens = await api.auth.login(input);
-    tokenStore.setTokens(tokens);
-
-    const profile = await api.auth.me();
-    setUser(profile);
-    return profile;
-  }, []);
+  const login = React.useCallback(
+    async (input: LoginInput) => {
+      tokenStore.setTokens(await appApi.api.auth.login(input));
+      const profile = await appApi.api.auth.me();
+      setUser(profile);
+      return profile;
+    },
+    [appApi, tokenStore],
+  );
 
   const logout = React.useCallback(async () => {
     const refreshToken = tokenStore.getRefreshToken();
 
     if (refreshToken) {
       // A failed revoke must not trap the user in a session they asked to end.
-      await api.auth.logout(refreshToken).catch(() => undefined);
+      await appApi.api.auth.logout(refreshToken).catch(() => undefined);
     }
 
     tokenStore.clear();
     setUser(null);
-    router.push('/');
-  }, [router]);
+    router.push(logoutPath);
+  }, [appApi, tokenStore, router, logoutPath]);
 
   const value = React.useMemo(
     () => ({ user, isLoading, login, logout, refreshUser: loadUser }),
@@ -91,7 +107,7 @@ export function useAuth(): AuthContextValue {
   return context;
 }
 
-/** Maps any thrown value to the Arabic message the form should display. */
+/** Maps any thrown value to the Arabic message a form should display. */
 export function toErrorMessage(error: unknown): string {
   if (error instanceof ApiError) return error.message;
   return 'حدث خطأ غير متوقع. حاول مرة أخرى.';

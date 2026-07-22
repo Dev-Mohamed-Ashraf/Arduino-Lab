@@ -1,8 +1,8 @@
 ---
 id: 09
 title: Print / Export
-status: planned
-started: -
+status: in-progress
+started: 2026-07-23
 completed: -
 depends_on: [07]
 ---

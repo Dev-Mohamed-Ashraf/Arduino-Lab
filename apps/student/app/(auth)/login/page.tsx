@@ -11,7 +11,7 @@ import { useForm } from 'react-hook-form';
 
 import { AuthCard } from '@/components/auth/auth-card';
 import { FormField } from '@/components/auth/form-field';
-import { toErrorMessage, useAuth } from '@/lib/auth-context';
+import { toErrorMessage, useAuth } from '@arduino-lab/web';
 
 export default function LoginPage() {
   // useSearchParams opts the page out of static prerendering unless it sits

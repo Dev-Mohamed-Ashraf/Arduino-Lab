@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { ComponentsPanel } from '@/components/dashboard/components-panel';
 import { SlotsPanel } from '@/components/dashboard/slots-panel';
 import { publicApi } from '@/lib/api';
-import { formatLongDate, todayIso } from '@/lib/format';
+import { formatLongDate, todayIso } from '@arduino-lab/web';
 
 // The lab's occupancy changes minute to minute; a short window keeps the page
 // fast without showing numbers that are meaningfully stale.

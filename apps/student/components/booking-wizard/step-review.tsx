@@ -8,7 +8,7 @@ import Image from 'next/image';
 import { useFormContext } from 'react-hook-form';
 
 import { api } from '@/lib/api';
-import { formatLongDate } from '@/lib/format';
+import { formatLongDate } from '@arduino-lab/web';
 
 export function StepReview() {
   const { watch } = useFormContext<CreateBookingInput>();

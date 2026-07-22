@@ -19,7 +19,7 @@ import { useTheme } from 'next-themes';
 import Link from 'next/link';
 import * as React from 'react';
 
-import { useAuth } from '@/lib/auth-context';
+import { useAuth } from '@arduino-lab/web';
 
 const NAV_LINKS = [
   { href: '/', label: 'الرئيسية' },

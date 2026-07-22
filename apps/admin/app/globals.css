@@ -1,0 +1,14 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import '@arduino-lab/ui/styles.css';
+
+/* next-themes toggles a class on <html>, so `dark:` must follow the class rather
+   than the OS preference. This is an entry-point directive; it cannot live in
+   the shared package. */
+@custom-variant dark (&:is(.dark *));
+
+/* Tailwind scans the importing app by default; the shared component package
+   lives outside this directory and has to be pointed at explicitly. */
+@source "../../../packages/ui/src";
+@source "../app";
+@source "../components";

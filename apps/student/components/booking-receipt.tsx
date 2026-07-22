@@ -23,7 +23,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 
 import { api } from '@/lib/api';
-import { formatDateTime, formatLongDate } from '@/lib/format';
+import { formatDateTime, formatLongDate } from '@arduino-lab/web';
 
 export function BookingReceipt({ bookingNumber }: { bookingNumber: string }) {
   const { data, isPending, isError, refetch } = useQuery({

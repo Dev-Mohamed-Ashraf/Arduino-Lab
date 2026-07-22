@@ -16,7 +16,7 @@ import { CalendarPlus, CalendarX, Lock, Printer, Receipt, Users } from 'lucide-r
 import Link from 'next/link';
 
 import { api } from '@/lib/api';
-import { formatLongDate } from '@/lib/format';
+import { formatLongDate } from '@arduino-lab/web';
 
 const STATUS_VARIANTS: Record<BookingStatus, 'success' | 'destructive' | 'secondary'> = {
   CONFIRMED: 'success',

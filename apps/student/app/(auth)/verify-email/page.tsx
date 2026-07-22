@@ -8,7 +8,7 @@ import * as React from 'react';
 
 import { AuthCard } from '@/components/auth/auth-card';
 import { api } from '@/lib/api';
-import { toErrorMessage } from '@/lib/auth-context';
+import { toErrorMessage } from '@arduino-lab/web';
 
 export default function VerifyEmailPage() {
   return (

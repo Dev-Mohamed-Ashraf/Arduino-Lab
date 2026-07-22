@@ -7,7 +7,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import * as React from 'react';
 
 import { api } from '@/lib/api';
-import { useAuth } from '@/lib/auth-context';
+import { useAuth } from '@arduino-lab/web';
 
 /**
  * Client-side gate for pages that need a session.

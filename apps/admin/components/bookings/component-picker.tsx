@@ -1,0 +1,119 @@
+'use client';
+
+import type { Component, ComponentRequest } from '@arduino-lab/contracts';
+import { Badge, Button, Card, Input, Skeleton, StockBadge } from '@arduino-lab/ui';
+import { useQuery } from '@tanstack/react-query';
+import { Minus, Plus, Search } from 'lucide-react';
+import * as React from 'react';
+
+import { api } from '@/lib/api';
+
+/**
+ * Component selector for the admin edit form.
+ *
+ * `alreadyHeld` is the quantity this booking currently reserves. Those units are
+ * added back to the ceiling because editing releases them first — without that
+ * an admin could not raise a quantity on a component that is otherwise fully
+ * booked out by this very booking.
+ */
+export function ComponentPicker({
+  value,
+  alreadyHeld,
+  onChange,
+}: {
+  value: ComponentRequest[];
+  alreadyHeld: Map<string, number>;
+  onChange: (next: ComponentRequest[]) => void;
+}) {
+  const [search, setSearch] = React.useState('');
+
+  const { data, isPending } = useQuery({
+    queryKey: ['components', 'picker'],
+    queryFn: () => api.components.list({ pageSize: 100 }),
+  });
+
+  const selected = new Map(value.map((item) => [item.componentId, item.quantity]));
+
+  function setQuantity(component: Component, quantity: number): void {
+    const ceiling = component.availableQuantity + (alreadyHeld.get(component.id) ?? 0);
+    const clamped = Math.max(0, Math.min(quantity, ceiling));
+    const others = value.filter((item) => item.componentId !== component.id);
+
+    onChange(clamped === 0 ? others : [...others, { componentId: component.id, quantity: clamped }]);
+  }
+
+  const visible = React.useMemo(() => {
+    const term = search.trim().toLowerCase();
+    const items = data?.items ?? [];
+    return term ? items.filter((item) => item.name.toLowerCase().includes(term)) : items;
+  }, [data, search]);
+
+  if (isPending) return <Skeleton className="h-64 w-full" />;
+
+  return (
+    <div className="space-y-3">
+      <div className="relative">
+        <Search
+          className="text-muted-foreground pointer-events-none absolute top-1/2 start-3 size-4 -translate-y-1/2"
+          aria-hidden
+        />
+        <Input
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder="ابحث عن مكوّن…"
+          className="ps-9"
+          aria-label="ابحث عن مكوّن"
+        />
+      </div>
+
+      <ul className="max-h-72 space-y-2 overflow-y-auto pe-1">
+        {visible.map((component) => {
+          const quantity = selected.get(component.id) ?? 0;
+          const ceiling = component.availableQuantity + (alreadyHeld.get(component.id) ?? 0);
+
+          return (
+            <li key={component.id}>
+              <Card className="flex-row items-center gap-3 p-3">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium">{component.name}</p>
+                  <div className="mt-1 flex items-center gap-2">
+                    <StockBadge status={component.status} />
+                    <Badge variant="outline" className="tabular-nums">
+                      يمكن حجز: {ceiling}
+                    </Badge>
+                  </div>
+                </div>
+
+                <div className="flex shrink-0 items-center gap-1">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon-sm"
+                    aria-label={`إنقاص ${component.name}`}
+                    onClick={() => setQuantity(component, quantity - 1)}
+                    disabled={quantity === 0}
+                  >
+                    <Minus aria-hidden />
+                  </Button>
+                  <span className="w-9 text-center text-sm font-semibold tabular-nums">
+                    {quantity}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon-sm"
+                    aria-label={`زيادة ${component.name}`}
+                    onClick={() => setQuantity(component, quantity + 1)}
+                    disabled={quantity >= ceiling}
+                  >
+                    <Plus aria-hidden />
+                  </Button>
+                </div>
+              </Card>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
