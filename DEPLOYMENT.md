@@ -39,10 +39,9 @@ Neon → GitHub → Render (API) → Vercel (موقعين) → ربط الروا
 3. للبداية استخدم دومين الاختبار: `MAIL_FROM="Arduino Lab <onboarding@resend.dev>"`.
    (لاحقًا: وثّق دومينك الخاص عشان الإيميلات ما تروحش سبام.)
 
-## 4. GitHub
+## 4. GitHub — ✅ معمولة
 
-1. أنشئ ريبو **فاضي** (بدون README).
-2. ابعتلي رابطه — أنا بربط الـ remote وأعمل `git push` بعد إذنك.
+الكود مرفوع على: https://github.com/Dev-Mohamed-Ashraf/Arduino-Lab (فرع `main`).
 
 ## 5. Render (API)
 
