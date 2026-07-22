@@ -1,0 +1,243 @@
+// Arduino Lab Reservation & Components Management System
+// See plans/01-database-schema.md for the design rationale behind every decision here.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─────────────────────────────────────────────────────────────
+//  Enums
+// ─────────────────────────────────────────────────────────────
+
+enum Role {
+  STUDENT
+  TEACHING_TEAM
+  ADMIN
+}
+
+enum BookingStatus {
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+}
+
+// ─────────────────────────────────────────────────────────────
+//  Identity
+// ─────────────────────────────────────────────────────────────
+
+model User {
+  id              String    @id @default(cuid())
+  email           String    @unique
+  passwordHash    String
+  fullName        String
+  studentCode     String?
+  phone           String?
+  role            Role      @default(STUDENT)
+  emailVerifiedAt DateTime?
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  verificationTokens EmailVerificationToken[]
+  passwordResetTokens PasswordResetToken[]
+  refreshTokens      RefreshToken[]
+  ownedBookings      Booking[]                @relation("BookingOwner")
+  createdBookings    Booking[]                @relation("BookingCreator")
+  auditLogs          AuditLog[]
+
+  @@index([role])
+}
+
+/// Single-use token emailed to confirm a university address.
+model EmailVerificationToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+/// Rotating refresh tokens. Only the SHA-256 hash is stored, never the raw token.
+model RefreshToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  userAgent String?
+  ipAddress String?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+// ─────────────────────────────────────────────────────────────
+//  Lab resources
+// ─────────────────────────────────────────────────────────────
+
+/// One of the four fixed lab periods. Capacity is per slot **per day**.
+model TimeSlot {
+  id        String   @id @default(cuid())
+  label     String   @unique
+  startTime String
+  endTime   String
+  capacity  Int      @default(5)
+  isOpen    Boolean  @default(true)
+  sortOrder Int      @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  bookings Booking[]
+}
+
+/// An Arduino part in the lab inventory.
+///
+/// `availableQuantity` is deliberately NOT stored — it is always derived as
+/// `totalQuantity - reservedQuantity`. Keeping `totalQuantity` untouched preserves
+/// the real inventory size for reporting, and returning parts simply decrements
+/// `reservedQuantity`.
+model Component {
+  id               String   @id @default(cuid())
+  name             String   @unique
+  sku              String?  @unique
+  description      String?
+  imageUrl         String?
+  totalQuantity    Int      @default(0)
+  reservedQuantity Int      @default(0)
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  bookingItems BookingComponent[]
+
+  @@index([isActive])
+  @@index([name])
+}
+
+// ─────────────────────────────────────────────────────────────
+//  Bookings
+// ─────────────────────────────────────────────────────────────
+
+/// A group's reservation of one time slot on one day.
+///
+/// Uniqueness of `groupNumber` within a (date, slot) is enforced in
+/// `BookingsService` while holding a `FOR UPDATE` lock on the TimeSlot row —
+/// a DB unique constraint cannot express "only among CONFIRMED rows", which
+/// would wrongly block re-booking after a cancellation.
+model Booking {
+  id                 String        @id @default(cuid())
+  bookingNumber      String        @unique
+  groupNumber        Int
+  projectTitle       String
+  projectDescription String
+  bookingDate        DateTime      @db.Date
+  timeSlotId         String
+  idCardUrl          String
+  idCardPublicId     String
+  status             BookingStatus @default(CONFIRMED)
+  notes              String?
+  ownerId            String
+  createdById        String
+  cancelledAt        DateTime?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  timeSlot  TimeSlot @relation(fields: [timeSlotId], references: [id], onDelete: Restrict)
+  owner     User     @relation("BookingOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  createdBy User     @relation("BookingCreator", fields: [createdById], references: [id], onDelete: Restrict)
+
+  members    BookingMember[]
+  components BookingComponent[]
+
+  @@index([bookingDate, timeSlotId, status])
+  @@index([ownerId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([groupNumber])
+}
+
+/// A student inside a booked group. Max 6 rows per booking — enforced by a
+/// trigger in the constraints migration and by zod on the way in.
+model BookingMember {
+  id          String  @id @default(cuid())
+  bookingId   String
+  fullName    String
+  studentCode String?
+  sortOrder   Int
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@unique([bookingId, sortOrder])
+  @@index([bookingId])
+}
+
+model BookingComponent {
+  id          String @id @default(cuid())
+  bookingId   String
+  componentId String
+  quantity    Int
+
+  booking   Booking   @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  component Component @relation(fields: [componentId], references: [id], onDelete: Restrict)
+
+  @@unique([bookingId, componentId])
+  @@index([componentId])
+}
+
+// ─────────────────────────────────────────────────────────────
+//  Audit
+// ─────────────────────────────────────────────────────────────
+
+/// Append-only trail of every admin mutation.
+model AuditLog {
+  id        String      @id @default(cuid())
+  actorId   String?
+  action    AuditAction
+  entity    String
+  entityId  String
+  before    Json?
+  after     Json?
+  ipAddress String?
+  createdAt DateTime    @default(now())
+
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([entity, entityId])
+  @@index([actorId])
+  @@index([createdAt])
+}

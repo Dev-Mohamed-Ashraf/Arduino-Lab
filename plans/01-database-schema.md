@@ -1,8 +1,8 @@
 ---
 id: 01
 title: Database Schema
-status: planned
-started: -
+status: in-progress
+started: 2026-07-22
 completed: -
 depends_on: [00]
 ---
