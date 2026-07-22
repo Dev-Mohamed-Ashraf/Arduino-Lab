@@ -39,12 +39,10 @@
     ],
     "deny": [
       "Bash(rm -rf:*)",
-      "Bash(git push:*)",
       "Bash(git reset --hard:*)",
       "Bash(pnpm db:reset:*)",
       "Bash(npx prisma migrate reset:*)",
       "PowerShell(Remove-Item -Recurse -Force:*)",
-      "PowerShell(git push:*)",
       "PowerShell(git reset --hard:*)",
       "PowerShell(pnpm db:reset:*)",
       "PowerShell(npx prisma migrate reset:*)",
