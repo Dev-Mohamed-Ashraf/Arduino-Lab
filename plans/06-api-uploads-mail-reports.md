@@ -121,12 +121,25 @@ pnpm --filter @arduino-lab/api lint       ✅
 pnpm --filter @arduino-lab/api typecheck  ✅
 ```
 
-### ⚠️ متبقٍ للتحقق
+### ✅ تحقق رفع Cloudinary — 2026-07-23
 
-توليد توقيع Cloudinary مكتوب لكن **مش متحقق منه** — محتاج
-`CLOUDINARY_CLOUD_NAME` و `CLOUDINARY_API_KEY` و `CLOUDINARY_API_SECRET`.
-المتحقق منه دلوقتي إن الـ endpoint بيرفض الطلب برسالة عربية واضحة لما المفاتيح ناقصة.
-أول ما توصل المفاتيح: يتحط في `.env`، ويتأكد إن الرفع من المتصفح بينجح، وإن ملف
-6MB وملف PDF بيترفضوا.
+المفاتيح اتحطّت في `.env` واتشغّل سكربت رفع فعلي على Cloudinary الحقيقي:
 
-نفس الشيء لـ Resend: القوالب مكتوبة والإرسال بيتطبع في اللوج دلوقتي بدل ما يتبعت.
+```
+ok  signature endpoint returns 200        ok  Cloudinary accepts the signed upload
+ok  signature is a non-empty string       ok  returned URL is https
+ok  folder pinned to arduino-lab/id-cards ok  stored inside the id-cards folder
+ok  upload url points at the right cloud  ok  a tampered signature is rejected
+    cleaned up arduino-lab/id-cards/df2z…  (اترفع، اتّخزن، اتّمسح)
+```
+
+**باج حقيقي اتصاد وكان هيكسر كل رفع في الإنتاج:**
+التوقيع كان بيتحسب **مع** `max_bytes`، لكن Cloudinary **مش بيعتبره بارامتر توقيع** —
+فبيتحقق من غيره → `Invalid Signature`. رسالة Cloudinary أكّدت إن `max_bytes` مش في
+الـ string-to-sign. اتشال من التوقيع (`uploads.service.ts`) ومن فورم الرفع
+(`apps/student/lib/upload.ts`). حد الـ 5MB متفروض client-side قبل الرفع أصلاً.
+
+### ⚠️ لسه متبقٍ: Resend
+
+القوالب مكتوبة والإرسال بيتطبع في اللوج دلوقتي بدل ما يتبعت. محتاج `RESEND_API_KEY`
+عشان يتأكد إن إيميل التأكيد وتأكيد الحجز بيوصلوا فعلاً.

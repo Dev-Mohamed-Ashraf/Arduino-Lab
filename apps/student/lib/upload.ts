@@ -2,6 +2,9 @@ import { ID_CARD_ALLOWED_MIME_TYPES, ID_CARD_MAX_BYTES } from '@arduino-lab/cont
 
 import { api } from './api';
 
+// Must match the params the server signs in UploadsService — every signed field
+// has to be present and identical, and no extra signed field may be added.
+
 export interface UploadedImage {
   url: string;
   publicId: string;
@@ -33,7 +36,6 @@ export async function uploadIdCard(
   form.append('signature', signature.signature);
   form.append('folder', signature.folder);
   form.append('allowed_formats', 'jpg,jpeg,png,webp');
-  form.append('max_bytes', String(ID_CARD_MAX_BYTES));
   form.append('transformation', 'c_limit,w_1600,h_1600,q_auto,f_auto');
 
   const response = await postWithProgress(signature.uploadUrl, form, onProgress);

@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ERROR_CODES, ID_CARD_MAX_BYTES, type UploadSignature } from '@arduino-lab/contracts';
+import { ERROR_CODES, type UploadSignature } from '@arduino-lab/contracts';
 import { v2 as cloudinary } from 'cloudinary';
 
 import { AppConfigService } from '../../config/app-config.service';
@@ -34,12 +34,16 @@ export class UploadsService {
     const timestamp = Math.floor(Date.now() / 1000);
 
     // Every field signed here is one the client cannot change without
-    // invalidating the signature.
+    // invalidating the signature. `max_bytes` is deliberately NOT signed:
+    // Cloudinary does not treat it as a signable upload parameter, so including
+    // it here produces a signature the upload endpoint rejects. The 5 MB ceiling
+    // is enforced on the client before upload; the folder, formats and
+    // transformation below are all validated by Cloudinary against this
+    // signature.
     const params = {
       folder,
       timestamp,
       allowed_formats: ALLOWED_FORMATS.join(','),
-      max_bytes: ID_CARD_MAX_BYTES,
       // Shrink and re-encode on the way in so a 5 MB phone photo lands as a
       // reasonable file and the receipt page stays fast.
       transformation: 'c_limit,w_1600,h_1600,q_auto,f_auto',
