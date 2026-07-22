@@ -3,6 +3,9 @@
   "compilerOptions": {
     "module": "CommonJS",
     "moduleResolution": "Node",
+    // The HTTP client is built on fetch/URL/AbortSignal, so DOM typings are
+    // required even though the schemas themselves are environment-agnostic.
+    "lib": ["ES2023", "DOM"],
     "outDir": "dist",
     "rootDir": "src"
   },
