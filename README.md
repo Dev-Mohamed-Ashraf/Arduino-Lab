@@ -2,6 +2,14 @@
 
 نظام ويب متكامل لإدارة حجز مواعيد معمل الأردوينو وتنظيم صرف المكونات.
 
+## روابط الإنتاج
+
+| الخدمة | الرابط |
+|---|---|
+| موقع الطلبة | https://arduino-lab-student.vercel.app |
+| لوحة الأدمن | https://arduino-lab-admin.vercel.app |
+| الـ API | https://arduino-lab-api.onrender.com/api/v1 |
+
 ## المشكلة اللي بيحلها
 
 - تضارب مواعيد المجموعات في المعمل

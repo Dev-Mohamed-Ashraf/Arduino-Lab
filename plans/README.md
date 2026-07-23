@@ -27,7 +27,7 @@
 | 07 | [Student App](./07-student-app.md) | ✅ done | 2026-07-22 | 2026-07-23 |
 | 08 | [Admin App](./08-admin-app.md) | ✅ done | 2026-07-23 | 2026-07-23 |
 | 09 | [Print / Export](./09-print-export.md) | ✅ done | 2026-07-23 | 2026-07-23 |
-| 10 | [Deployment](./10-deployment.md) | ⚠️ config done | 2026-07-23 | - |
+| 10 | [Deployment](./10-deployment.md) | ✅ done (live) | 2026-07-23 | 2026-07-23 |
 | 11 | [Hardening + Tests](./11-hardening-tests.md) | ✅ done | 2026-07-23 | 2026-07-23 |
 
 ## ترتيب التنفيذ

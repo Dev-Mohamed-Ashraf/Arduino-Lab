@@ -1,10 +1,9 @@
 ---
 id: 10
 title: Deployment
-status: blocked
+status: done
 started: 2026-07-23
-completed: -
-blocked_on: النشر الفعلي محتاج حسابات المستخدم (GitHub · Cloudinary · Resend) + موافقة على git push. كل ملفات الإعداد جاهزة.
+completed: 2026-07-23
 depends_on: [07, 08, 09]
 ---
 
@@ -118,3 +117,51 @@ Claude بيجهّز كل ملفات الإعداد. الخطوات دي محتا
 - UptimeRobot أخضر، وبعد 30 دقيقة خمول أول طلب لسه سريع
 - رفع صورة من الإنتاج بيوصل Cloudinary
 - إيميل تأكيد بيوصل من الإنتاج
+
+---
+
+## اللي اتنفّذ فعلاً — 2026-07-23
+
+### الروابط الحيّة
+| الخدمة | الرابط |
+|---|---|
+| API | https://arduino-lab-api.onrender.com |
+| موقع الطلبة | https://arduino-lab-student.vercel.app |
+| لوحة الأدمن | https://arduino-lab-admin.vercel.app |
+| GitHub | https://github.com/Dev-Mohamed-Ashraf/Arduino-Lab |
+
+### 5 باجّات نشر اتصادت — كلها من نمط الـ monorepo، ما ظهرتش محليًا
+
+1. **`prisma: not found`** — `NODE_ENV=production` بيخلّي pnpm يتخطّى devDependencies،
+   وprisma/nest-cli منهم. الحل: `pnpm install --frozen-lockfile --prod=false`.
+2. **`Cannot find module '@arduino-lab/contracts'` (Render)** — الحزمة بتشحن TS محتاج
+   `dist/`، والأمر كان بيبني الـ API بس. الحل: بناء contracts قبل الـ API.
+3. **الـ dist فاضي رغم نجاح tsc** — `.tsbuildinfo` قديم بره `dist` خلّى tsc يفتكر
+   إن كله محدّث. الحل: `tsBuildInfoFile` جوه `dist`. (على Render checkout نضيف
+   فمكنش هيحصل، بس اتصلّح للمتانة المحلية.)
+4. **`STUDENT_APP_URL/ADMIN_APP_URL Required`** — مشكلة الدجاجة والبيضة: الـ API لازم
+   يقوم قبل ما الفرونت يتنشر، والفرونت محتاج رابط الـ API. الحل: الرابطين اختياريين
+   بـ default فاضي، وCORS بيفلتر الفاضي.
+5. **`Cannot find module '@arduino-lab/contracts'` (Vercel)** — نفس باج 2 للفرونت.
+   `transpilePackages` بيحوّل المصدر بس module resolution بيدوّر على `dist`. الحل:
+   بناء contracts قبل `next build` في `vercel.json`.
+
+### التحقق الفعلي على الإنتاج
+
+```
+GET /health                                → status:ok · database:up
+GET /slots · /dashboard                    → 200 · 4 فترات من Neon
+admin login (admin@university.edu.eg)      → 200
+موقع الطلبة SSR                             → dir=rtl · الفترات والمكونات بترندر من الـ API
+لوحة الأدمن /login                          → 200 · noindex
+CORS: دومين الطلبة → مسموح · الأدمن → مسموح · غريب → مرفوض
+رحلة كاملة: register 201 (+ إيميل Resend) → admin login → list users 200
+```
+
+### الخطوات اليدوية اللي عملها المستخدم
+Cloudinary keys · Resend key · Neon URLs · حسابات Render + Vercel × 2 · إضافة
+متغيرات البيئة · `Save, rebuild, and deploy`.
+
+### متبقٍ (اختياري)
+- **UptimeRobot** على `/health` كل 5 دقايق — يمنع Render المجاني من النوم.
+- توثيق دومين Resend خاص (بدل `onboarding@resend.dev`) لو الإيميلات راحت سبام.
