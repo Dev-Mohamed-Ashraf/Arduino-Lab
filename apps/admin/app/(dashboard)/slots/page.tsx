@@ -2,27 +2,27 @@
 
 import { ApiError, type SlotAvailability } from '@arduino-lab/contracts';
 import {
-  Badge,
   Button,
-  Card,
+  EmptyState,
   ErrorState,
-  Input,
-  Label,
   PageHeader,
-  Progress,
   Skeleton,
-  Switch,
   toast,
 } from '@arduino-lab/ui';
 import { todayIso } from '@arduino-lab/web';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { CalendarClock, Plus } from 'lucide-react';
 import * as React from 'react';
 
 import { DatePicker } from '@/components/date-picker';
+import { SlotCard } from '@/components/slots/slot-card';
+import { SlotDialog } from '@/components/slots/slot-dialog';
 import { api } from '@/lib/api';
 
 export default function SlotsPage() {
   const [date, setDate] = React.useState(todayIso);
+  const [editing, setEditing] = React.useState<SlotAvailability | undefined>();
+  const [isDialogOpen, setIsDialogOpen] = React.useState(false);
   const queryClient = useQueryClient();
 
   const { data, isPending, isError, refetch } = useQuery({
@@ -42,12 +42,41 @@ export default function SlotsPage() {
     },
   });
 
+  const remove = useMutation({
+    mutationFn: (id: string) => api.slots.remove(id),
+    onSuccess: async () => {
+      toast.success('تم حذف الفترة.');
+      await queryClient.invalidateQueries({ queryKey: ['slots'] });
+    },
+    onError: (error) => {
+      toast.error(error instanceof ApiError ? error.message : 'تعذّر حذف الفترة.');
+    },
+  });
+
+  function openCreate(): void {
+    setEditing(undefined);
+    setIsDialogOpen(true);
+  }
+
+  function openEdit(slot: SlotAvailability): void {
+    setEditing(slot);
+    setIsDialogOpen(true);
+  }
+
   return (
     <div className="space-y-6 p-4 sm:p-6">
       <PageHeader
         title="الفترات الزمنية"
-        description="عدّل سعة كل فترة أو أغلقها مؤقتًا."
-        action={<DatePicker id="slots-date" label="" value={date} onChange={setDate} showLongDate />}
+        description="أضف فترة أو عدّل اسمها ومواعيدها وسعتها."
+        action={
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+            <DatePicker id="slots-date" label="" value={date} onChange={setDate} showLongDate />
+            <Button onClick={openCreate}>
+              <Plus aria-hidden />
+              إضافة فترة
+            </Button>
+          </div>
+        }
       />
 
       {isError ? (
@@ -58,97 +87,29 @@ export default function SlotsPage() {
             <Skeleton key={index} className="h-56 w-full" />
           ))}
         </div>
+      ) : data.length === 0 ? (
+        <EmptyState
+          icon={<CalendarClock />}
+          title="لا توجد فترات"
+          description="أضف أول فترة حتى يتمكن الطلبة من الحجز."
+        />
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
           {data.map((slot) => (
-            <SlotEditor
+            <SlotCard
               key={slot.id}
               slot={slot}
               isSaving={update.isPending && update.variables?.id === slot.id}
+              isDeleting={remove.isPending && remove.variables === slot.id}
               onSave={(changes) => update.mutate({ id: slot.id, ...changes })}
+              onEdit={() => openEdit(slot)}
+              onDelete={() => remove.mutate(slot.id)}
             />
           ))}
         </div>
       )}
+
+      <SlotDialog slot={editing} open={isDialogOpen} onOpenChange={setIsDialogOpen} />
     </div>
-  );
-}
-
-function SlotEditor({
-  slot,
-  isSaving,
-  onSave,
-}: {
-  slot: SlotAvailability;
-  isSaving: boolean;
-  onSave: (changes: { capacity?: number; isOpen?: boolean }) => void;
-}) {
-  const [capacity, setCapacity] = React.useState(String(slot.capacity));
-
-  // The server is the source of truth; a rejected save must not leave a stale
-  // number sitting in the field.
-  React.useEffect(() => setCapacity(String(slot.capacity)), [slot.capacity]);
-
-  const parsed = Number(capacity);
-  const isDirty = Number.isInteger(parsed) && parsed > 0 && parsed !== slot.capacity;
-  const percent = slot.capacity > 0 ? (slot.booked / slot.capacity) * 100 : 0;
-
-  return (
-    <Card className="gap-4 p-4 sm:p-5">
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-lg font-semibold tabular-nums">{slot.label}</span>
-        <Badge variant={slot.isOpen ? 'success' : 'secondary'}>
-          {slot.isOpen ? 'مفتوحة' : 'مغلقة'}
-        </Badge>
-      </div>
-
-      <div className="space-y-2">
-        <div className="flex items-baseline justify-between text-sm">
-          <span className="text-muted-foreground">الإشغال في هذا اليوم</span>
-          <span className="font-semibold tabular-nums">
-            {slot.booked} / {slot.capacity}
-          </span>
-        </div>
-        <Progress value={percent} />
-      </div>
-
-      <div className="flex items-end gap-2">
-        <div className="flex-1 space-y-1.5">
-          <Label htmlFor={`capacity-${slot.id}`}>السعة</Label>
-          <Input
-            id={`capacity-${slot.id}`}
-            type="number"
-            min={1}
-            max={50}
-            value={capacity}
-            onChange={(event) => setCapacity(event.target.value)}
-          />
-        </div>
-        <Button
-          size="default"
-          disabled={!isDirty}
-          isLoading={isSaving}
-          onClick={() => onSave({ capacity: parsed })}
-        >
-          حفظ
-        </Button>
-      </div>
-
-      <div className="flex items-center justify-between gap-3 border-t pt-3">
-        <div className="min-w-0">
-          <Label htmlFor={`open-${slot.id}`}>متاحة للحجز</Label>
-          <p className="text-muted-foreground text-xs">
-            {slot.booked > 0 && slot.isOpen
-              ? `الإغلاق لن يلغي ${slot.booked} حجزًا قائمًا.`
-              : 'الإغلاق يمنع الحجوزات الجديدة فقط.'}
-          </p>
-        </div>
-        <Switch
-          id={`open-${slot.id}`}
-          checked={slot.isOpen}
-          onCheckedChange={(isOpen) => onSave({ isOpen })}
-        />
-      </div>
-    </Card>
   );
 }

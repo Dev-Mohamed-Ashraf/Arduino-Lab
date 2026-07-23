@@ -74,13 +74,20 @@ export function OverviewStatCards({
   );
 }
 
-/** Names the components that need restocking rather than just counting them. */
+/**
+ * Names the components that need restocking rather than just counting them.
+ *
+ * Stock resets each period, so the signal is the busiest single session: a part
+ * that ran out at peak is the one to buy more of.
+ */
 export function StockAlert({ rows }: { rows: ComponentUsageRow[] }) {
-  const empty = rows.filter((row) => row.availableQuantity <= 0);
+  const spareAtPeak = (row: ComponentUsageRow): number =>
+    row.totalQuantity - row.peakSessionDemand;
+
+  const empty = rows.filter((row) => spareAtPeak(row) <= 0);
   const low = rows.filter(
     (row) =>
-      row.availableQuantity > 0 &&
-      row.availableQuantity / Math.max(1, row.totalQuantity) <= LOW_STOCK_RATIO,
+      spareAtPeak(row) > 0 && spareAtPeak(row) / Math.max(1, row.totalQuantity) <= LOW_STOCK_RATIO,
   );
 
   if (empty.length === 0 && low.length === 0) return null;

@@ -11,32 +11,43 @@ import { api } from '@/lib/api';
 /**
  * Component selector for the admin edit form.
  *
- * `alreadyHeld` is the quantity this booking currently reserves. Those units are
- * added back to the ceiling because editing releases them first — without that
- * an admin could not raise a quantity on a component that is otherwise fully
- * booked out by this very booking.
+ * Availability is read for the booking's own session, since stock resets each
+ * period. `alreadyHeld` is what this booking takes in that session; those units
+ * are added back because the server excludes the edited booking from its own
+ * check — without that an admin could not raise a quantity on a component this
+ * very booking already took.
  */
 export function ComponentPicker({
   value,
   alreadyHeld,
+  bookingDate,
+  timeSlotId,
   onChange,
 }: {
   value: ComponentRequest[];
   alreadyHeld: Map<string, number>;
+  bookingDate: string;
+  timeSlotId: string;
   onChange: (next: ComponentRequest[]) => void;
 }) {
   const [search, setSearch] = React.useState('');
 
   const { data, isPending } = useQuery({
-    queryKey: ['components', 'picker'],
-    queryFn: () => api.components.list({ pageSize: 100 }),
+    queryKey: ['components', 'picker', bookingDate, timeSlotId],
+    queryFn: () =>
+      api.components.list({ pageSize: 100, date: bookingDate, timeSlotId }),
   });
 
   const selected = new Map(value.map((item) => [item.componentId, item.quantity]));
 
+  /** Free in this session, plus what this booking gives back, capped by the rule. */
+  function ceilingFor(component: Component): number {
+    const free = component.availableQuantity + (alreadyHeld.get(component.id) ?? 0);
+    return Math.min(free, component.maxPerBooking);
+  }
+
   function setQuantity(component: Component, quantity: number): void {
-    const ceiling = component.availableQuantity + (alreadyHeld.get(component.id) ?? 0);
-    const clamped = Math.max(0, Math.min(quantity, ceiling));
+    const clamped = Math.max(0, Math.min(quantity, ceilingFor(component)));
     const others = value.filter((item) => item.componentId !== component.id);
 
     onChange(clamped === 0 ? others : [...others, { componentId: component.id, quantity: clamped }]);
@@ -69,7 +80,7 @@ export function ComponentPicker({
       <ul className="max-h-72 space-y-2 overflow-y-auto pe-1">
         {visible.map((component) => {
           const quantity = selected.get(component.id) ?? 0;
-          const ceiling = component.availableQuantity + (alreadyHeld.get(component.id) ?? 0);
+          const ceiling = ceilingFor(component);
 
           return (
             <li key={component.id}>

@@ -2,9 +2,9 @@
 
 import {
   ApiError,
-  createComponentSchema,
-  type Component,
-  type CreateComponentInput,
+  createSlotSchema,
+  type CreateSlotInput,
+  type SlotAvailability,
 } from '@arduino-lab/contracts';
 import {
   Alert,
@@ -18,7 +18,6 @@ import {
   DialogTitle,
   Input,
   Label,
-  Textarea,
   toast,
 } from '@arduino-lab/ui';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -29,45 +28,55 @@ import { useForm } from 'react-hook-form';
 
 import { api } from '@/lib/api';
 
+const DEFAULT_SLOT: CreateSlotInput = {
+  label: '',
+  startTime: '11:00',
+  endTime: '12:00',
+  capacity: 5,
+};
+
 /** Create and edit share one form; only the submit target differs. */
-export function ComponentDialog({
-  component,
+export function SlotDialog({
+  slot,
   open,
   onOpenChange,
 }: {
-  component?: Component;
+  slot?: SlotAvailability;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
   const queryClient = useQueryClient();
   const [formError, setFormError] = React.useState<string | null>(null);
-  const isEditing = Boolean(component);
+  const isEditing = Boolean(slot);
 
   const {
     register,
     handleSubmit,
     reset,
     formState: { errors },
-  } = useForm<CreateComponentInput>({ resolver: zodResolver(createComponentSchema) });
+  } = useForm<CreateSlotInput>({ resolver: zodResolver(createSlotSchema) });
 
   React.useEffect(() => {
     if (!open) return;
     setFormError(null);
-    reset({
-      name: component?.name ?? '',
-      sku: component?.sku ?? '',
-      description: component?.description ?? '',
-      totalQuantity: component?.totalQuantity ?? 0,
-      maxPerBooking: component?.maxPerBooking ?? 1,
-    });
-  }, [open, component, reset]);
+    reset(
+      slot
+        ? {
+            label: slot.label,
+            startTime: slot.startTime,
+            endTime: slot.endTime,
+            capacity: slot.capacity,
+          }
+        : DEFAULT_SLOT,
+    );
+  }, [open, slot, reset]);
 
   const save = useMutation({
-    mutationFn: (values: CreateComponentInput) =>
-      component ? api.components.update(component.id, values) : api.components.create(values),
+    mutationFn: (values: CreateSlotInput) =>
+      slot ? api.slots.update(slot.id, values) : api.slots.create(values),
     onSuccess: async () => {
-      toast.success(isEditing ? 'تم حفظ التعديلات.' : 'تمت إضافة المكوّن.');
-      await queryClient.invalidateQueries({ queryKey: ['components'] });
+      toast.success(isEditing ? 'تم حفظ التعديلات.' : 'تمت إضافة الفترة.');
+      await queryClient.invalidateQueries({ queryKey: ['slots'] });
       onOpenChange(false);
     },
     onError: (error) => {
@@ -79,9 +88,9 @@ export function ComponentDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{isEditing ? 'تعديل مكوّن' : 'إضافة مكوّن'}</DialogTitle>
+          <DialogTitle>{isEditing ? 'تعديل الفترة' : 'إضافة فترة'}</DialogTitle>
           <DialogDescription>
-            الكمية ترجع للمعمل بعد كل فترة، فالمجموعات تتنافس عليها داخل نفس الفترة واليوم فقط.
+            الاسم هو ما يراه الطالب في صفحة الحجز، والسعة هي عدد المجموعات المسموح بها في الفترة.
           </DialogDescription>
         </DialogHeader>
 
@@ -97,39 +106,28 @@ export function ComponentDialog({
             </Alert>
           ) : null}
 
-          <Field id="name" label="اسم المكوّن" required error={errors.name?.message}>
-            <Input id="name" {...register('name')} />
-          </Field>
-
-          <Field id="sku" label="الكود" error={errors.sku?.message}>
-            <Input id="sku" dir="ltr" className="text-start" {...register('sku')} />
-          </Field>
-
-          <Field id="description" label="الوصف" error={errors.description?.message}>
-            <Textarea id="description" rows={3} {...register('description')} />
+          <Field id="label" label="اسم الفترة" required error={errors.label?.message}>
+            <Input id="label" placeholder="مثال: 11-12" {...register('label')} />
           </Field>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field
-              id="totalQuantity"
-              label="الكمية بالمعمل"
-              required
-              hint="عدد القطع التي يملكها المعمل من هذا المكوّن."
-              error={errors.totalQuantity?.message}
-            >
-              <Input id="totalQuantity" type="number" min={0} {...register('totalQuantity')} />
+            <Field id="startTime" label="من" required error={errors.startTime?.message}>
+              <Input id="startTime" type="time" dir="ltr" {...register('startTime')} />
             </Field>
 
-            <Field
-              id="maxPerBooking"
-              label="الحد لكل مجموعة"
-              required
-              hint="أقصى عدد تأخذه المجموعة الواحدة في الحجز."
-              error={errors.maxPerBooking?.message}
-            >
-              <Input id="maxPerBooking" type="number" min={1} {...register('maxPerBooking')} />
+            <Field id="endTime" label="إلى" required error={errors.endTime?.message}>
+              <Input id="endTime" type="time" dir="ltr" {...register('endTime')} />
             </Field>
           </div>
+
+          <Field
+            id="capacity"
+            label="عدد المجموعات"
+            required
+            error={errors.capacity?.message}
+          >
+            <Input id="capacity" type="number" min={1} max={50} {...register('capacity')} />
+          </Field>
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
@@ -149,14 +147,12 @@ function Field({
   id,
   label,
   required,
-  hint,
   error,
   children,
 }: {
   id: string;
   label: string;
   required?: boolean;
-  hint?: string;
   error?: string;
   children: React.ReactNode;
 }) {
@@ -166,7 +162,6 @@ function Field({
         {label}
       </Label>
       {children}
-      {hint && !error ? <p className="text-muted-foreground text-xs">{hint}</p> : null}
       {error ? (
         <p className="text-destructive text-sm" role="alert">
           {error}

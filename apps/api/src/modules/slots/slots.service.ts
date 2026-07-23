@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import {
   ERROR_CODES,
+  type CreateSlotInput,
   type SlotAvailability,
   type TimeSlot,
   type UpdateSlotInput,
@@ -67,9 +68,16 @@ export class SlotsService {
       await this.assertCapacityNotBelowBooked(id, input.capacity);
     }
 
+    if (input.label && input.label !== before.label) {
+      await this.assertLabelFree(input.label);
+    }
+
     const after = await this.prisma.timeSlot.update({
       where: { id },
       data: {
+        ...(input.label !== undefined ? { label: input.label } : {}),
+        ...(input.startTime !== undefined ? { startTime: input.startTime } : {}),
+        ...(input.endTime !== undefined ? { endTime: input.endTime } : {}),
         ...(input.capacity !== undefined ? { capacity: input.capacity } : {}),
         ...(input.isOpen !== undefined ? { isOpen: input.isOpen } : {}),
       },
@@ -85,6 +93,72 @@ export class SlotsService {
     });
 
     return toSlotDto(after);
+  }
+
+  async create(actorId: string, input: CreateSlotInput): Promise<TimeSlot> {
+    await this.assertLabelFree(input.label);
+
+    // sortOrder is unique and drives display order; new periods go last.
+    const last = await this.prisma.timeSlot.findFirst({
+      orderBy: { sortOrder: 'desc' },
+      select: { sortOrder: true },
+    });
+
+    const created = await this.prisma.timeSlot.create({
+      data: {
+        label: input.label,
+        startTime: input.startTime,
+        endTime: input.endTime,
+        capacity: input.capacity,
+        sortOrder: (last?.sortOrder ?? 0) + 1,
+      },
+    });
+
+    await this.audit.record({
+      actorId,
+      action: AuditAction.CREATE,
+      entity: 'TimeSlot',
+      entityId: created.id,
+      after: created,
+    });
+
+    return toSlotDto(created);
+  }
+
+  /**
+   * Deletes a period.
+   *
+   * Refused outright when any booking references it: the Booking → TimeSlot
+   * relation is `Restrict`, and losing the period would strip the time off every
+   * receipt that already carries it.
+   */
+  async remove(actorId: string, id: string): Promise<void> {
+    const slot = await this.prisma.timeSlot.findUnique({
+      where: { id },
+      include: { _count: { select: { bookings: true } } },
+    });
+    if (!slot) throw new NotFoundError(ERROR_CODES.SLOT_NOT_FOUND);
+
+    if (slot._count.bookings > 0) {
+      throw new ConflictError(ERROR_CODES.SLOT_HAS_BOOKINGS, {
+        slot: [`مرتبطة بـ ${slot._count.bookings} حجز. أغلقها بدل حذفها.`],
+      });
+    }
+
+    await this.prisma.timeSlot.delete({ where: { id } });
+
+    await this.audit.record({
+      actorId,
+      action: AuditAction.DELETE,
+      entity: 'TimeSlot',
+      entityId: id,
+      before: slot,
+    });
+  }
+
+  private async assertLabelFree(label: string): Promise<void> {
+    const clash = await this.prisma.timeSlot.findUnique({ where: { label } });
+    if (clash) throw new ConflictError(ERROR_CODES.SLOT_LABEL_TAKEN);
   }
 
   /**

@@ -18,9 +18,14 @@ export const componentUsageRowSchema = z.object({
   sku: z.string().nullable(),
   timesRequested: z.number().int(),
   totalQuantityRequested: z.number().int(),
-  currentlyReserved: z.number().int(),
   totalQuantity: z.number().int(),
-  availableQuantity: z.number().int(),
+  maxPerBooking: z.number().int(),
+  /**
+   * The busiest single session: stock is per period, so what matters is not the
+   * total booked across the range but the most ever needed at one time.
+   * See plans/13-per-slot-stock.md.
+   */
+  peakSessionDemand: z.number().int(),
 });
 
 export const slotUtilisationRowSchema = z.object({

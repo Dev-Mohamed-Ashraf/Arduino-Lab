@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { cuidSchema, paginationQuerySchema } from './common.schema';
+import { cuidSchema, isoDateSchema, paginationQuerySchema } from './common.schema';
 
 export const STOCK_STATUSES = ['available', 'low', 'out'] as const;
 export const stockStatusSchema = z.enum(STOCK_STATUSES);
@@ -20,7 +20,9 @@ export const componentSchema = z.object({
   description: z.string().nullable(),
   imageUrl: z.string().nullable(),
   totalQuantity: z.number().int(),
-  reservedQuantity: z.number().int(),
+  maxPerBooking: z.number().int(),
+  /** Taken by other bookings in the queried session; 0 when none was given. */
+  usedQuantity: z.number().int(),
   availableQuantity: z.number().int(),
   status: stockStatusSchema,
   isActive: z.boolean(),
@@ -36,6 +38,13 @@ export const createComponentSchema = z.object({
     .int('الكمية يجب أن تكون رقمًا صحيحًا.')
     .min(0, 'الكمية لا يمكن أن تكون سالبة.')
     .max(100_000, 'الكمية كبيرة بشكل غير منطقي.'),
+  /** Ceiling per group. Defaults to one so a new part is rationed until reviewed. */
+  maxPerBooking: z.coerce
+    .number()
+    .int('الحد يجب أن يكون رقمًا صحيحًا.')
+    .min(1, 'الحد يجب أن يكون 1 على الأقل.')
+    .max(1000, 'الحد كبير جدًا.')
+    .default(1),
 });
 
 export const updateComponentSchema = createComponentSchema.partial().extend({
@@ -47,6 +56,10 @@ export const listComponentsQuerySchema = paginationQuerySchema.extend({
   status: stockStatusSchema.optional(),
   /** When true, inactive components are included — admin views only. */
   includeInactive: z.coerce.boolean().default(false),
+  // Stock is per session: give both and availability is what is free in that
+  // period; give neither and it is the lab's full holding.
+  date: isoDateSchema.optional(),
+  timeSlotId: cuidSchema.optional(),
 });
 
 /** One line of a component to be requested by a booking. */

@@ -1,9 +1,23 @@
-import { Body, Controller, Get, Param, Patch, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
+  createSlotSchema,
   cuidSchema,
   slotAvailabilityQuerySchema,
   updateSlotSchema,
+  type CreateSlotInput,
   type SlotAvailabilityQuery,
   type UpdateSlotInput,
 } from '@arduino-lab/contracts';
@@ -35,15 +49,38 @@ export class SlotsController {
     return this.slots.availability(query.date);
   }
 
+  @Post()
+  @Roles('ADMIN')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Add a lab period' })
+  create(
+    @CurrentUser() actor: RequestUser,
+    @Body(zodBody(createSlotSchema)) input: CreateSlotInput,
+  ) {
+    return this.slots.create(actor.id, input);
+  }
+
   @Patch(':id')
   @Roles('ADMIN')
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Change a period capacity or open state' })
+  @ApiOperation({ summary: 'Rename a period or change its times, capacity or open state' })
   update(
     @CurrentUser() actor: RequestUser,
     @Param('id', new ZodValidationPipe(cuidSchema)) id: string,
     @Body(zodBody(updateSlotSchema)) input: UpdateSlotInput,
   ) {
     return this.slots.update(actor.id, id, input);
+  }
+
+  @Delete(':id')
+  @Roles('ADMIN')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Delete a period that has no bookings' })
+  remove(
+    @CurrentUser() actor: RequestUser,
+    @Param('id', new ZodValidationPipe(cuidSchema)) id: string,
+  ) {
+    return this.slots.remove(actor.id, id);
   }
 }

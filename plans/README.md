@@ -30,6 +30,7 @@
 | 10 | [Deployment](./10-deployment.md) | ✅ done (live) | 2026-07-23 | 2026-07-23 |
 | 11 | [Hardening + Tests](./11-hardening-tests.md) | ✅ done | 2026-07-23 | 2026-07-23 |
 | 12 | [إلغاء تأكيد الإيميل](./12-remove-email-verification.md) | ✅ done | 2026-07-23 | 2026-07-23 |
+| 13 | [مخزون لكل فترة + حد المجموعة + إدارة الفترات](./13-per-slot-stock.md) | ✅ done | 2026-07-23 | 2026-07-23 |
 
 ## ترتيب التنفيذ
 

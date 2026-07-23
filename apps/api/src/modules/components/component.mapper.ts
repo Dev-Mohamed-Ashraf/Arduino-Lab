@@ -2,24 +2,28 @@ import { LOW_STOCK_THRESHOLD_RATIO, type Component, type StockStatus } from '@ar
 import type { Component as ComponentRow } from '@prisma/client';
 
 /**
- * Availability is always derived, never stored — see the note on the Component
- * model in schema.prisma.
+ * How much of a part is free.
+ *
+ * `usedQuantity` is what other bookings in the *same* (date, slot) already hold —
+ * stock is per session, so it is only meaningful with that context. Callers
+ * without a session (the public catalogue, the admin inventory table) pass 0 and
+ * get the lab's full holding. See plans/13-per-slot-stock.md.
  */
-export function availableQuantity(row: Pick<ComponentRow, 'totalQuantity' | 'reservedQuantity'>): number {
-  return row.totalQuantity - row.reservedQuantity;
+export function availableQuantity(totalQuantity: number, usedQuantity: number): number {
+  return Math.max(0, totalQuantity - usedQuantity);
 }
 
-export function stockStatus(row: Pick<ComponentRow, 'totalQuantity' | 'reservedQuantity'>): StockStatus {
-  const available = availableQuantity(row);
+export function stockStatus(totalQuantity: number, usedQuantity: number): StockStatus {
+  const available = availableQuantity(totalQuantity, usedQuantity);
 
   if (available <= 0) return 'out';
-  if (row.totalQuantity > 0 && available / row.totalQuantity <= LOW_STOCK_THRESHOLD_RATIO) {
+  if (totalQuantity > 0 && available / totalQuantity <= LOW_STOCK_THRESHOLD_RATIO) {
     return 'low';
   }
   return 'available';
 }
 
-export function toComponentDto(row: ComponentRow): Component {
+export function toComponentDto(row: ComponentRow, usedQuantity = 0): Component {
   return {
     id: row.id,
     name: row.name,
@@ -27,9 +31,10 @@ export function toComponentDto(row: ComponentRow): Component {
     description: row.description,
     imageUrl: row.imageUrl,
     totalQuantity: row.totalQuantity,
-    reservedQuantity: row.reservedQuantity,
-    availableQuantity: availableQuantity(row),
-    status: stockStatus(row),
+    maxPerBooking: row.maxPerBooking,
+    usedQuantity,
+    availableQuantity: availableQuantity(row.totalQuantity, usedQuantity),
+    status: stockStatus(row.totalQuantity, usedQuantity),
     isActive: row.isActive,
   };
 }

@@ -14,7 +14,7 @@ import {
   StockBadge,
 } from '@arduino-lab/ui';
 import { useQuery } from '@tanstack/react-query';
-import { Minus, PackageSearch, Plus, Search, TriangleAlert } from 'lucide-react';
+import { CalendarClock, Minus, PackageSearch, Plus, Search, TriangleAlert } from 'lucide-react';
 import * as React from 'react';
 import { useFormContext } from 'react-hook-form';
 
@@ -27,17 +27,27 @@ export function StepComponents() {
   const { setValue, watch, formState } = useFormContext<CreateBookingInput>();
   const [search, setSearch] = React.useState('');
 
+  const bookingDate = watch('bookingDate');
+  const timeSlotId = watch('timeSlotId');
   const selected = watch('components') ?? [];
   const selectedById = new Map(selected.map((item) => [item.componentId, item.quantity]));
 
+  // Stock is per session, so availability is only meaningful once the period is
+  // known — which is why the slot step comes first. See plans/13-per-slot-stock.md.
   const { data, isPending, isError, refetch } = useQuery({
-    queryKey: ['components', 'all'],
-    queryFn: () => api.components.list({ pageSize: 100 }),
+    queryKey: ['components', 'session', bookingDate, timeSlotId],
+    queryFn: () => api.components.list({ pageSize: 100, date: bookingDate, timeSlotId }),
+    enabled: Boolean(bookingDate && timeSlotId),
     refetchInterval: AVAILABILITY_REFETCH_MS,
   });
 
+  /** A group may never take more than the lab allows, nor more than is free. */
+  function ceilingFor(component: Component): number {
+    return Math.min(component.availableQuantity, component.maxPerBooking);
+  }
+
   function setQuantity(component: Component, quantity: number): void {
-    const clamped = Math.max(0, Math.min(quantity, component.availableQuantity));
+    const clamped = Math.max(0, Math.min(quantity, ceilingFor(component)));
     const others = selected.filter((item) => item.componentId !== component.id);
 
     setValue(
@@ -57,12 +67,29 @@ export function StepComponents() {
     );
   }, [data, search]);
 
+  if (!bookingDate || !timeSlotId) {
+    return (
+      <Alert variant="warning">
+        <CalendarClock aria-hidden />
+        <AlertDescription>اختر الموعد أولًا حتى نعرض لك المكوّنات المتاحة فيه.</AlertDescription>
+      </Alert>
+    );
+  }
+
   if (isError) {
     return <ErrorState description="تعذّر تحميل قائمة المكوّنات." onRetry={() => void refetch()} />;
   }
 
   return (
     <div className="space-y-4">
+      <Alert variant="info">
+        <CalendarClock aria-hidden />
+        <AlertDescription>
+          الأرقام دي للفترة اللي اخترتها. المكوّنات بترجع للمعمل بعد كل فترة، فاللي مش متاح
+          هنا ممكن يكون متاح في فترة تانية.
+        </AlertDescription>
+      </Alert>
+
       <SelectionSummary
         selected={selected}
         components={data?.items ?? []}
@@ -103,7 +130,11 @@ export function StepComponents() {
           ))}
         </div>
       ) : visible.length === 0 ? (
-        <EmptyState icon={<PackageSearch />} title="لا توجد نتائج" description="جرّب كلمة أخرى." />
+        <EmptyState
+          icon={<PackageSearch />}
+          title="لا توجد مكوّنات"
+          description="جرّب كلمة أخرى، أو تواصل مع إدارة المعمل."
+        />
       ) : (
         <ul className="space-y-2">
           {visible.map((component) => (
@@ -111,6 +142,7 @@ export function StepComponents() {
               key={component.id}
               component={component}
               quantity={selectedById.get(component.id) ?? 0}
+              ceiling={ceilingFor(component)}
               onChange={(quantity) => setQuantity(component, quantity)}
             />
           ))}
@@ -123,14 +155,16 @@ export function StepComponents() {
 function ComponentRow({
   component,
   quantity,
+  ceiling,
   onChange,
 }: {
   component: Component;
   quantity: number;
+  ceiling: number;
   onChange: (quantity: number) => void;
 }) {
-  const isOut = component.availableQuantity === 0;
-  const atMax = quantity >= component.availableQuantity;
+  // A limit only worth showing when it is what actually stops the student.
+  const isLimitedByRule = component.maxPerBooking < component.availableQuantity;
 
   return (
     <li>
@@ -140,8 +174,13 @@ function ComponentRow({
           <div className="mt-1 flex flex-wrap items-center gap-2">
             <StockBadge status={component.status} />
             <Badge variant="outline" className="tabular-nums">
-              المتاح: {component.availableQuantity}
+              متاح في هذه الفترة: {component.availableQuantity}
             </Badge>
+            {isLimitedByRule ? (
+              <Badge variant="secondary" className="tabular-nums">
+                الحد لمجموعتك: {component.maxPerBooking}
+              </Badge>
+            ) : null}
           </div>
         </div>
 
@@ -165,7 +204,7 @@ function ComponentRow({
             size="icon-sm"
             aria-label={`زيادة كمية ${component.name}`}
             onClick={() => onChange(quantity + 1)}
-            disabled={isOut || atMax}
+            disabled={quantity >= ceiling}
           >
             <Plus aria-hidden />
           </Button>
@@ -186,7 +225,7 @@ function SelectionSummary({
 }) {
   if (selected.length === 0) {
     return (
-      <Alert variant="info">
+      <Alert>
         <PackageSearch aria-hidden />
         <AlertDescription>اختر المكوّنات التي يحتاجها مشروعكم من القائمة بالأسفل.</AlertDescription>
       </Alert>

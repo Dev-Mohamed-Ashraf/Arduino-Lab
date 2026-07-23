@@ -1,140 +1,67 @@
 import { ERROR_CODES, type ComponentRequest } from '@arduino-lab/contracts';
-import { Prisma } from '@prisma/client';
+import type { Prisma } from '@prisma/client';
 
 import { ConflictError } from '../../common/errors/app.exception';
+import { readComponentUsage, type SessionScope } from '../components/availability.query';
 
 /** The subset of PrismaClient available inside an interactive transaction. */
 export type TransactionClient = Prisma.TransactionClient;
 
 /**
- * Reserves stock for a set of components.
+ * Rejects a component selection the lab cannot actually hand out.
  *
- * Two properties matter here and both are bought with SQL rather than
- * application logic:
+ * Stock is per session: parts go back on the shelf when a period ends, so a
+ * booking only ever competes with other bookings in the *same period on the same
+ * day*. Nothing is decremented — availability is derived from the bookings
+ * themselves, so cancelling or editing a booking frees its parts with no
+ * bookkeeping and no counter that can drift.
  *
- * 1. **Atomicity.** Availability is checked and decremented in the same UPDATE.
- *    A SELECT followed by an UPDATE would leave a window in which another
- *    booking takes the last unit; PostgreSQL instead re-evaluates the WHERE
- *    clause against the freshly committed row when two transactions contend.
- *
- * 2. **No deadlocks.** Every requested row is locked up front in id order, so
- *    two bookings that share components can never grab them in opposite orders.
- *
- * Both steps are single statements: the database sits behind a network hop and
- * the enclosing transaction holds a slot lock, so every avoided round trip is
- * time no other booking spends queued.
+ * Race-free without a conditional UPDATE because every caller runs inside a
+ * transaction already holding the slot's `FOR UPDATE` lock, which serialises all
+ * bookings for that period. See plans/13-per-slot-stock.md.
  */
-export async function reserveComponents(
+export async function assertComponentsAvailable(
   tx: TransactionClient,
   requests: ComponentRequest[],
+  scope: SessionScope,
 ): Promise<void> {
   if (requests.length === 0) return;
 
-  const ids = requests.map((request) => request.componentId).sort();
-  await tx.$queryRaw`SELECT id FROM "Component" WHERE id = ANY(${ids}) ORDER BY id FOR UPDATE`;
+  const usage = await readComponentUsage(
+    tx,
+    requests.map((request) => request.componentId),
+    scope,
+  );
+  const byId = new Map(usage.map((row) => [row.id, row]));
 
-  const claimed = await tx.$queryRaw<{ id: string }[]>`
-    UPDATE "Component" AS c
-    SET "reservedQuantity" = c."reservedQuantity" + r.qty
-    FROM (
-      SELECT * FROM UNNEST(
-        ${requests.map((request) => request.componentId)}::text[],
-        ${requests.map((request) => request.quantity)}::int[]
-      ) AS t(id, qty)
-    ) AS r
-    WHERE c.id = r.id
-      AND c."isActive" = true
-      AND (c."totalQuantity" - c."reservedQuantity") >= r.qty
-    RETURNING c.id
-  `;
+  for (const request of requests) {
+    const component = byId.get(request.componentId);
 
-  if (claimed.length !== requests.length) {
-    const claimedIds = new Set(claimed.map((row) => row.id));
-    const missing = requests.find((request) => !claimedIds.has(request.componentId));
+    if (!component) {
+      throw new ConflictError(ERROR_CODES.COMPONENT_NOT_FOUND);
+    }
 
-    // A short claim always has an unclaimed request behind it; the fallback only
-    // satisfies the type checker.
-    throw await outOfStockError(tx, missing ?? { componentId: ids[0] ?? '', quantity: 0 });
-  }
-}
+    if (!component.isActive) {
+      throw new ConflictError(ERROR_CODES.COMPONENT_INACTIVE, {
+        components: [`المكوّن "${component.name}" غير متاح حاليًا.`],
+      });
+    }
 
-/** Returns stock to the pool, e.g. when a booking is cancelled or edited down. */
-export async function releaseComponents(
-  tx: TransactionClient,
-  requests: ComponentRequest[],
-): Promise<void> {
-  if (requests.length === 0) return;
+    if (request.quantity > component.maxPerBooking) {
+      throw new ConflictError(ERROR_CODES.COMPONENT_EXCEEDS_LIMIT, {
+        components: [
+          `الحد الأقصى من "${component.name}" هو ${component.maxPerBooking} لكل مجموعة.`,
+        ],
+      });
+    }
 
-  await tx.$executeRaw`
-    UPDATE "Component" AS c
-    SET "reservedQuantity" = GREATEST(0, c."reservedQuantity" - r.qty)
-    FROM (
-      SELECT * FROM UNNEST(
-        ${requests.map((request) => request.componentId)}::text[],
-        ${requests.map((request) => request.quantity)}::int[]
-      ) AS t(id, qty)
-    ) AS r
-    WHERE c.id = r.id
-  `;
-}
-
-/**
- * Applies the difference between two component selections.
- *
- * Releases run before reservations so that freeing units of a component makes
- * them immediately available to the same edit.
- */
-export async function applyComponentDelta(
-  tx: TransactionClient,
-  previous: ComponentRequest[],
-  next: ComponentRequest[],
-): Promise<void> {
-  const previousById = new Map(previous.map((item) => [item.componentId, item.quantity]));
-  const nextById = new Map(next.map((item) => [item.componentId, item.quantity]));
-
-  const toRelease: ComponentRequest[] = [];
-  const toReserve: ComponentRequest[] = [];
-
-  for (const [componentId, before] of previousById) {
-    const after = nextById.get(componentId) ?? 0;
-    if (after < before) {
-      toRelease.push({ componentId, quantity: before - after });
+    const free = component.totalQuantity - component.usedQuantity;
+    if (request.quantity > free) {
+      throw new ConflictError(ERROR_CODES.COMPONENT_OUT_OF_STOCK, {
+        components: [
+          `المتاح من "${component.name}" في هذه الفترة هو ${free} فقط، وطلبت ${request.quantity}.`,
+        ],
+      });
     }
   }
-
-  for (const [componentId, after] of nextById) {
-    const before = previousById.get(componentId) ?? 0;
-    if (after > before) {
-      toReserve.push({ componentId, quantity: after - before });
-    }
-  }
-
-  await releaseComponents(tx, toRelease);
-  await reserveComponents(tx, toReserve);
-}
-
-/** Distinguishes "no such component" from "not enough of it" for the error message. */
-async function outOfStockError(
-  tx: TransactionClient,
-  request: ComponentRequest,
-): Promise<ConflictError> {
-  const component = await tx.component.findUnique({
-    where: { id: request.componentId },
-    select: { name: true, isActive: true, totalQuantity: true, reservedQuantity: true },
-  });
-
-  if (!component) {
-    return new ConflictError(ERROR_CODES.COMPONENT_NOT_FOUND);
-  }
-
-  if (!component.isActive) {
-    return new ConflictError(ERROR_CODES.COMPONENT_INACTIVE, {
-      components: [`المكوّن "${component.name}" غير متاح حاليًا.`],
-    });
-  }
-
-  const available = component.totalQuantity - component.reservedQuantity;
-  return new ConflictError(ERROR_CODES.COMPONENT_OUT_OF_STOCK, {
-    components: [`المتاح من "${component.name}" هو ${available} فقط، وطلبت ${request.quantity}.`],
-  });
 }

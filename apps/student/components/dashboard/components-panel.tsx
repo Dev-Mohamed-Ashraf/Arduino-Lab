@@ -21,9 +21,13 @@ import * as React from 'react';
 /**
  * Inventory list.
  *
+ * Shows what the lab owns, not what is free right now: stock is per session, so
+ * a single "available" number means nothing outside a chosen date and period.
+ * The live figure appears in the booking wizard once the period is picked.
+ *
  * Rendered as a table from `md` up and as cards below it — a horizontally
- * scrolling five-column table is unusable on a phone, which is where most
- * students will check availability before coming to the lab.
+ * scrolling table is unusable on a phone, which is where most students will
+ * check the inventory before coming to the lab.
  */
 export function ComponentsPanel({ components }: { components: Component[] }) {
   const [search, setSearch] = React.useState('');
@@ -47,7 +51,12 @@ export function ComponentsPanel({ components }: { components: Component[] }) {
   return (
     <section className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h2 className="text-lg font-semibold sm:text-xl">المكوّنات المتاحة</h2>
+        <div>
+          <h2 className="text-lg font-semibold sm:text-xl">مكوّنات المعمل</h2>
+          <p className="text-muted-foreground text-sm">
+            المكوّنات ترجع للمعمل بعد كل فترة — المتاح فعليًا يظهر لك بعد اختيار الموعد.
+          </p>
+        </div>
 
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <div className="relative">
@@ -70,7 +79,7 @@ export function ComponentsPanel({ components }: { components: Component[] }) {
             onClick={() => setAvailableOnly((value) => !value)}
             aria-pressed={availableOnly}
           >
-            المتاح فقط
+            الموجود فقط
           </Button>
         </div>
       </div>
@@ -88,8 +97,8 @@ export function ComponentsPanel({ components }: { components: Component[] }) {
               <TableHeader>
                 <TableRow>
                   <TableHead>المكوّن</TableHead>
-                  <TableHead className="w-28">الكمية الكلية</TableHead>
-                  <TableHead className="w-28">المتاح</TableHead>
+                  <TableHead className="w-32">الكمية بالمعمل</TableHead>
+                  <TableHead className="w-36">الحد لكل مجموعة</TableHead>
                   <TableHead className="w-36">الحالة</TableHead>
                 </TableRow>
               </TableHeader>
@@ -102,10 +111,10 @@ export function ComponentsPanel({ components }: { components: Component[] }) {
                         <div className="text-muted-foreground text-xs">{component.description}</div>
                       ) : null}
                     </TableCell>
-                    <TableCell className="tabular-nums">{component.totalQuantity}</TableCell>
                     <TableCell className="font-semibold tabular-nums">
-                      {component.availableQuantity}
+                      {component.totalQuantity}
                     </TableCell>
+                    <TableCell className="tabular-nums">{component.maxPerBooking}</TableCell>
                     <TableCell>
                       <StockBadge status={component.status} />
                     </TableCell>
@@ -129,10 +138,10 @@ export function ComponentsPanel({ components }: { components: Component[] }) {
                 </div>
                 <div className="flex items-center gap-2 text-sm">
                   <Badge variant="outline" className="tabular-nums">
-                    المتاح: {component.availableQuantity}
+                    بالمعمل: {component.totalQuantity}
                   </Badge>
                   <Badge variant="secondary" className="tabular-nums">
-                    الإجمالي: {component.totalQuantity}
+                    الحد لكل مجموعة: {component.maxPerBooking}
                   </Badge>
                 </div>
               </Card>

@@ -11,8 +11,10 @@ import { AuditAction, Prisma } from '@prisma/client';
 
 import { ConflictError, NotFoundError } from '../../common/errors/app.exception';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { toDateOnly, todayInLabTimeZone } from '../../common/utils/dates';
 import { paginate, toPrismaPagination } from '../../common/utils/pagination';
 import { AuditService } from '../audit/audit.service';
+import { readComponentUsage } from './availability.query';
 import { toComponentDto } from './component.mapper';
 
 @Injectable()
@@ -45,7 +47,13 @@ export class ComponentsService {
       this.prisma.component.count({ where }),
     ]);
 
-    const items = rows.map(toComponentDto);
+    // With a session in the query, availability is what is free in that period;
+    // without one it is the lab's full holding. See plans/13-per-slot-stock.md.
+    const usedById = await this.readSessionUsage(
+      rows.map((row) => row.id),
+      query,
+    );
+    const items = rows.map((row) => toComponentDto(row, usedById.get(row.id) ?? 0));
 
     // Stock status is a derived value, so it cannot be filtered in SQL without
     // duplicating the threshold rule in two places.
@@ -59,13 +67,64 @@ export class ComponentsService {
       where: { isActive: true },
       orderBy: { name: 'asc' },
     });
-    return rows.map(toComponentDto);
+    return rows.map((row) => toComponentDto(row));
   }
 
   async findOne(id: string): Promise<Component> {
     const row = await this.prisma.component.findUnique({ where: { id } });
     if (!row) throw new NotFoundError(ERROR_CODES.COMPONENT_NOT_FOUND);
     return toComponentDto(row);
+  }
+
+  /**
+   * The largest amount any single upcoming session already promised.
+   *
+   * Stock is per session, so what matters is not the sum across all future
+   * bookings but the busiest one — that is the number the lab must be able to
+   * hand out on the day. See plans/13-per-slot-stock.md.
+   */
+  private async countUpcomingDemand(componentId: string): Promise<number> {
+    const rows = await this.prisma.$queryRaw<{ peak: bigint | null }[]>`
+      SELECT MAX(session_total) AS peak
+      FROM (
+        SELECT SUM(bc.quantity) AS session_total
+        FROM "BookingComponent" AS bc
+        JOIN "Booking" AS b ON b.id = bc."bookingId"
+        WHERE bc."componentId" = ${componentId}
+          AND b.status = 'CONFIRMED'::"BookingStatus"
+          AND b."bookingDate" >= ${toDateOnly(todayInLabTimeZone())}
+        GROUP BY b."bookingDate", b."timeSlotId"
+      ) AS sessions
+    `;
+
+    return Number(rows[0]?.peak ?? 0);
+  }
+
+  private async assertNotBelowUpcomingDemand(componentId: string, total: number): Promise<void> {
+    const peak = await this.countUpcomingDemand(componentId);
+
+    if (total < peak) {
+      throw new ConflictError(ERROR_CODES.TOTAL_BELOW_RESERVED, {
+        totalQuantity: [`أكبر عدد مطلوب في فترة قادمة واحدة هو ${peak}.`],
+      });
+    }
+  }
+
+  /** Empty unless the caller named both a date and a period. */
+  private async readSessionUsage(
+    componentIds: string[],
+    query: ListComponentsQuery,
+  ): Promise<Map<string, number>> {
+    if (!query.date || !query.timeSlotId || componentIds.length === 0) {
+      return new Map();
+    }
+
+    const usage = await readComponentUsage(this.prisma, componentIds, {
+      bookingDate: toDateOnly(query.date),
+      timeSlotId: query.timeSlotId,
+    });
+
+    return new Map(usage.map((row) => [row.id, row.usedQuantity]));
   }
 
   async create(actorId: string, input: CreateComponentInput): Promise<Component> {
@@ -79,6 +138,7 @@ export class ComponentsService {
         description: input.description || null,
         imageUrl: input.imageUrl || null,
         totalQuantity: input.totalQuantity,
+        maxPerBooking: input.maxPerBooking,
       },
     });
 
@@ -97,12 +157,10 @@ export class ComponentsService {
     const before = await this.prisma.component.findUnique({ where: { id } });
     if (!before) throw new NotFoundError(ERROR_CODES.COMPONENT_NOT_FOUND);
 
-    // The DB check constraint would also catch this, but a typed 409 gives the
-    // admin an actionable Arabic message instead of a generic conflict.
-    if (input.totalQuantity !== undefined && input.totalQuantity < before.reservedQuantity) {
-      throw new ConflictError(ERROR_CODES.TOTAL_BELOW_RESERVED, {
-        totalQuantity: [`الكمية المحجوزة حاليًا ${before.reservedQuantity} قطعة.`],
-      });
+    // Lowering the holding below what an upcoming session already promised would
+    // leave those groups short on the day.
+    if (input.totalQuantity !== undefined && input.totalQuantity < before.totalQuantity) {
+      await this.assertNotBelowUpcomingDemand(id, input.totalQuantity);
     }
 
     if (input.name && input.name !== before.name) {
@@ -140,9 +198,10 @@ export class ComponentsService {
     });
     if (!component) throw new NotFoundError(ERROR_CODES.COMPONENT_NOT_FOUND);
 
-    if (component.reservedQuantity > 0) {
+    const upcoming = await this.countUpcomingDemand(id);
+    if (upcoming > 0) {
       throw new ConflictError(ERROR_CODES.COMPONENT_IN_USE, {
-        component: [`لا يزال ${component.reservedQuantity} منها محجوزًا في حجوزات قائمة.`],
+        component: [`مطلوب منه ${upcoming} في حجوزات قادمة.`],
       });
     }
 
@@ -189,6 +248,7 @@ export class ComponentsService {
           sku: item.sku || null,
           description: item.description || null,
           totalQuantity: item.totalQuantity,
+          maxPerBooking: item.maxPerBooking,
         })),
       });
 
@@ -217,6 +277,7 @@ function toUpdateData(input: UpdateComponentInput): Prisma.ComponentUpdateInput 
   if (input.description !== undefined) data.description = input.description || null;
   if (input.imageUrl !== undefined) data.imageUrl = input.imageUrl || null;
   if (input.totalQuantity !== undefined) data.totalQuantity = input.totalQuantity;
+  if (input.maxPerBooking !== undefined) data.maxPerBooking = input.maxPerBooking;
   if (input.isActive !== undefined) data.isActive = input.isActive;
 
   return data;

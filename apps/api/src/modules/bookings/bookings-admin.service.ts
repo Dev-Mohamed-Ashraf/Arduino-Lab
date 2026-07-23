@@ -21,17 +21,18 @@ import {
   lockSlot,
   readOccupancy,
 } from './slot-lock.helper';
+import { assertComponentsAvailable, type TransactionClient } from './stock.helper';
 
 /** Matches the create path — see the note in bookings.service.ts. */
 const BOOKING_TRANSACTION_OPTIONS = { maxWait: 20_000, timeout: 30_000 } as const;
-import { applyComponentDelta, releaseComponents, type TransactionClient } from './stock.helper';
 
 /**
  * Administrative changes to confirmed bookings.
  *
  * Students cannot reach any of this: once a booking is confirmed it is locked,
- * and only an admin may edit, move or cancel it. Every path adjusts stock inside
- * the same transaction as the change itself.
+ * and only an admin may edit, move or cancel it. Component availability is
+ * derived per session, so none of these paths adjust a stock counter — see
+ * plans/13-per-slot-stock.md.
  */
 @Injectable()
 export class BookingsAdminService {
@@ -65,17 +66,18 @@ export class BookingsAdminService {
       assertGroupNumberFree(occupancy);
 
       if (input.components) {
-        await applyComponentDelta(tx, toRequests(before.components), input.components);
+        // Availability is derived, so nothing is released first — the booking's
+        // own rows are simply excluded from the count.
+        await assertComponentsAvailable(tx, input.components, {
+          bookingDate,
+          timeSlotId,
+          excludeBookingId: id,
+        });
         await replaceComponents(tx, id, input.components);
       }
 
       if (input.members) {
         await replaceMembers(tx, id, input.members);
-      }
-
-      // Cancelling through the edit form must also return the stock.
-      if (input.status === BookingStatus.CANCELLED && before.status !== BookingStatus.CANCELLED) {
-        await releaseComponents(tx, toRequests(before.components));
       }
 
       return tx.booking.update({
@@ -129,10 +131,12 @@ export class BookingsAdminService {
   }
 
   /**
-   * Cancels a booking and returns its components to the pool.
+   * Cancels a booking.
    *
-   * The row is kept rather than deleted so the lab retains a record of what was
-   * booked and by whom.
+   * Its components need no explicit release: availability is derived from
+   * CONFIRMED bookings only, so flipping the status frees them. The row is kept
+   * rather than deleted so the lab retains a record of what was booked and by
+   * whom.
    */
   async cancel(actorId: string, id: string): Promise<void> {
     const booking = await this.loadOrThrow(id);
@@ -141,13 +145,10 @@ export class BookingsAdminService {
       throw new ConflictError(ERROR_CODES.BOOKING_ALREADY_CANCELLED);
     }
 
-    await this.prisma.$transaction(async (tx) => {
-      await releaseComponents(tx, toRequests(booking.components));
-      await tx.booking.update({
-        where: { id },
-        data: { status: BookingStatus.CANCELLED, cancelledAt: new Date() },
-      });
-    }, BOOKING_TRANSACTION_OPTIONS);
+    await this.prisma.booking.update({
+      where: { id },
+      data: { status: BookingStatus.CANCELLED, cancelledAt: new Date() },
+    });
 
     await this.audit.record({
       actorId,
@@ -188,13 +189,7 @@ export class BookingsAdminService {
   }
 }
 
-type BookingComponentRow = { componentId: string; quantity: number };
-
-function toRequests(items: BookingComponentRow[]): ComponentRequest[] {
-  return items.map((item) => ({ componentId: item.componentId, quantity: item.quantity }));
-}
-
-/** Rows are replaced wholesale; the stock delta has already been applied. */
+/** Rows are replaced wholesale; availability was validated before this runs. */
 async function replaceComponents(
   tx: TransactionClient,
   bookingId: string,

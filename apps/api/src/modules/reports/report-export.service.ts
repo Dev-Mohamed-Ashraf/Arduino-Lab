@@ -63,9 +63,9 @@ export class ReportExportService {
         { header: 'الكود', value: (row) => row.sku },
         { header: 'عدد مرات الطلب', value: (row) => row.timesRequested },
         { header: 'إجمالي الكمية المطلوبة', value: (row) => row.totalQuantityRequested },
-        { header: 'المحجوز حاليًا', value: (row) => row.currentlyReserved },
-        { header: 'الكمية الكلية', value: (row) => row.totalQuantity },
-        { header: 'المتاح', value: (row) => row.availableQuantity },
+        { header: 'الكمية بالمعمل', value: (row) => row.totalQuantity },
+        { header: 'الحد لكل مجموعة', value: (row) => row.maxPerBooking },
+        { header: 'أعلى طلب في فترة', value: (row) => row.peakSessionDemand },
       ]),
     };
   }
@@ -78,9 +78,9 @@ export class ReportExportService {
       content: toCsv(rows, [
         { header: 'المكوّن', value: (row) => row.name },
         { header: 'الكود', value: (row) => row.sku },
-        { header: 'الكمية الكلية', value: (row) => row.totalQuantity },
-        { header: 'المحجوز', value: (row) => row.currentlyReserved },
-        { header: 'المتاح', value: (row) => row.availableQuantity },
+        { header: 'الكمية بالمعمل', value: (row) => row.totalQuantity },
+        { header: 'الحد لكل مجموعة', value: (row) => row.maxPerBooking },
+        { header: 'أعلى طلب في فترة', value: (row) => row.peakSessionDemand },
       ]),
     };
   }

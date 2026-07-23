@@ -7,13 +7,18 @@ export interface WizardStep {
   fields: (keyof CreateBookingInput)[];
 }
 
+/**
+ * The period is chosen before the components on purpose: stock is per session,
+ * so what is available cannot be shown until the student has picked a date and a
+ * period. See plans/13-per-slot-stock.md.
+ */
 export const WIZARD_STEPS: WizardStep[] = [
   { id: 'group', title: 'بيانات المجموعة', fields: ['groupNumber'] },
   { id: 'members', title: 'أعضاء المجموعة', fields: ['members'] },
   { id: 'id-card', title: 'صورة البطاقة', fields: ['idCardUrl', 'idCardPublicId'] },
   { id: 'project', title: 'المشروع', fields: ['projectTitle', 'projectDescription'] },
-  { id: 'components', title: 'المكوّنات', fields: ['components'] },
   { id: 'slot', title: 'الموعد', fields: ['bookingDate', 'timeSlotId'] },
+  { id: 'components', title: 'المكوّنات', fields: ['components'] },
   { id: 'review', title: 'المراجعة', fields: [] },
 ];
 
@@ -24,14 +29,15 @@ export function stepIndexForErrorCode(code: string): number | null {
       return 0;
     case 'TOO_MANY_MEMBERS':
       return 1;
-    case 'COMPONENT_OUT_OF_STOCK':
-    case 'COMPONENT_NOT_FOUND':
-    case 'COMPONENT_INACTIVE':
-      return 4;
     case 'SLOT_FULL':
     case 'SLOT_CLOSED':
     case 'SLOT_NOT_FOUND':
     case 'BOOKING_DATE_IN_PAST':
+      return 4;
+    case 'COMPONENT_OUT_OF_STOCK':
+    case 'COMPONENT_EXCEEDS_LIMIT':
+    case 'COMPONENT_NOT_FOUND':
+    case 'COMPONENT_INACTIVE':
       return 5;
     default:
       return null;

@@ -86,7 +86,7 @@ export function EditBookingDialog({
   const save = useMutation({
     mutationFn: (input: UpdateBookingInput) => api.bookings.update(booking?.id ?? '', input),
     onSuccess: async () => {
-      toast.success('تم حفظ التعديلات وتسوية المخزون.');
+      toast.success('تم حفظ التعديلات.');
       await queryClient.invalidateQueries();
       onOpenChange(false);
     },
@@ -117,7 +117,7 @@ export function EditBookingDialog({
         <DialogHeader>
           <DialogTitle>تعديل الحجز</DialogTitle>
           <DialogDescription>
-            تغيير المكوّنات يُسوّي المخزون تلقائيًا. لنقل الحجز لفترة أخرى استخدم زر النقل.
+            الكميات المعروضة هي المتاح في فترة الحجز نفسها. لنقل الحجز لفترة أخرى استخدم زر النقل.
           </DialogDescription>
         </DialogHeader>
 
@@ -178,6 +178,8 @@ export function EditBookingDialog({
                 alreadyHeld={
                   new Map(booking.components.map((item) => [item.componentId, item.quantity]))
                 }
+                bookingDate={booking.bookingDate.slice(0, 10)}
+                timeSlotId={booking.timeSlot.id}
                 onChange={(components) => setDraft({ ...draft, components })}
               />
             </div>

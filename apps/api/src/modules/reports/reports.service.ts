@@ -9,7 +9,7 @@ import { BookingStatus, Prisma, Role } from '@prisma/client';
 
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { toDateOnly, todayInLabTimeZone } from '../../common/utils/dates';
-import { availableQuantity, stockStatus } from '../components/component.mapper';
+import { stockStatus } from '../components/component.mapper';
 import { SlotsService } from '../slots/slots.service';
 
 @Injectable()
@@ -24,10 +24,7 @@ export class ReportsService {
 
     const [availability, components, activeBookings, students] = await Promise.all([
       this.slots.availability(day),
-      this.prisma.component.findMany({
-        where: { isActive: true },
-        select: { totalQuantity: true, reservedQuantity: true },
-      }),
+      this.stock(),
       this.prisma.booking.count({ where: { status: BookingStatus.CONFIRMED } }),
       this.prisma.user.count({ where: { role: Role.STUDENT } }),
     ]);
@@ -41,8 +38,14 @@ export class ReportsService {
       ),
       totalCapacityToday: availability.reduce((sum, slot) => sum + slot.capacity, 0),
       activeBookingsTotal: activeBookings,
-      lowStockCount: components.filter((row) => stockStatus(row) === 'low').length,
-      outOfStockCount: components.filter((row) => stockStatus(row) === 'out').length,
+      // "Low" and "out" now mean: an upcoming session already wants most or all
+      // of what the lab owns. See plans/13-per-slot-stock.md.
+      lowStockCount: components.filter(
+        (row) => stockStatus(row.totalQuantity, row.peakSessionDemand) === 'low',
+      ).length,
+      outOfStockCount: components.filter(
+        (row) => stockStatus(row.totalQuantity, row.peakSessionDemand) === 'out',
+      ).length,
       studentsCount: students,
     };
   }
@@ -57,13 +60,14 @@ export class ReportsService {
   async componentsUsage(range: DateRangeQuery): Promise<ComponentUsageRow[]> {
     const where = bookingRangeFilter(range);
 
-    const [usage, components] = await Promise.all([
+    const [usage, peaks, components] = await Promise.all([
       this.prisma.bookingComponent.groupBy({
         by: ['componentId'],
         where: { booking: where },
         _count: { _all: true },
         _sum: { quantity: true },
       }),
+      this.readPeakSessionDemand(range),
       this.prisma.component.findMany({ orderBy: { name: 'asc' } }),
     ]);
 
@@ -77,19 +81,19 @@ export class ReportsService {
         sku: component.sku,
         timesRequested: stats?._count._all ?? 0,
         totalQuantityRequested: stats?._sum.quantity ?? 0,
-        currentlyReserved: component.reservedQuantity,
         totalQuantity: component.totalQuantity,
-        availableQuantity: availableQuantity(component),
+        maxPerBooking: component.maxPerBooking,
+        peakSessionDemand: peaks.get(component.id) ?? 0,
       };
     });
   }
 
-  /** Current inventory snapshot, sorted with the problems first. */
+  /** Inventory snapshot with the most contended parts first. */
   async stock(): Promise<ComponentUsageRow[]> {
-    const components = await this.prisma.component.findMany({
-      where: { isActive: true },
-      orderBy: { name: 'asc' },
-    });
+    const [components, peaks] = await Promise.all([
+      this.prisma.component.findMany({ where: { isActive: true }, orderBy: { name: 'asc' } }),
+      this.readPeakSessionDemand({ from: todayInLabTimeZone() }),
+    ]);
 
     return components
       .map((component) => ({
@@ -98,11 +102,41 @@ export class ReportsService {
         sku: component.sku,
         timesRequested: 0,
         totalQuantityRequested: 0,
-        currentlyReserved: component.reservedQuantity,
         totalQuantity: component.totalQuantity,
-        availableQuantity: availableQuantity(component),
+        maxPerBooking: component.maxPerBooking,
+        peakSessionDemand: peaks.get(component.id) ?? 0,
       }))
-      .sort((a, b) => a.availableQuantity - b.availableQuantity);
+      .sort(
+        (a, b) =>
+          a.totalQuantity - a.peakSessionDemand - (b.totalQuantity - b.peakSessionDemand),
+      );
+  }
+
+  /**
+   * The largest quantity of each part wanted by any single (date, slot).
+   *
+   * Parts return to the shelf between periods, so the number that decides
+   * whether the lab has enough is the busiest session, not the range total.
+   */
+  private async readPeakSessionDemand(range: DateRangeQuery): Promise<Map<string, number>> {
+    const from = range.from ? toDateOnly(range.from) : new Date(0);
+    const to = range.to ? toDateOnly(range.to) : new Date('9999-12-31');
+
+    const rows = await this.prisma.$queryRaw<{ componentId: string; peak: bigint }[]>`
+      SELECT "componentId", MAX(session_total) AS peak
+      FROM (
+        SELECT bc."componentId", SUM(bc.quantity) AS session_total
+        FROM "BookingComponent" AS bc
+        JOIN "Booking" AS b ON b.id = bc."bookingId"
+        WHERE b.status = ${BookingStatus.CONFIRMED}::"BookingStatus"
+          AND b."bookingDate" >= ${from}
+          AND b."bookingDate" <= ${to}
+        GROUP BY bc."componentId", b."bookingDate", b."timeSlotId"
+      ) AS sessions
+      GROUP BY "componentId"
+    `;
+
+    return new Map(rows.map((row) => [row.componentId, Number(row.peak)]));
   }
 
   async slotUtilisation(range: DateRangeQuery): Promise<SlotUtilisationRow[]> {

@@ -21,13 +21,14 @@ import { WIZARD_STEPS, stepIndexForErrorCode } from './steps';
 import { useBookingDraft } from './use-booking-draft';
 import { WizardProgress } from './wizard-progress';
 
+// Must stay in the same order as WIZARD_STEPS.
 const STEP_COMPONENTS = [
   StepGroup,
   StepMembers,
   StepIdCard,
   StepProject,
-  StepComponents,
   StepSlot,
+  StepComponents,
   StepReview,
 ];
 

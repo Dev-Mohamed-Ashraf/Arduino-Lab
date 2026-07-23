@@ -112,21 +112,28 @@ model TimeSlot {
 
 /// An Arduino part in the lab inventory.
 ///
-/// `availableQuantity` is deliberately NOT stored — it is always derived as
-/// `totalQuantity - reservedQuantity`. Keeping `totalQuantity` untouched preserves
-/// the real inventory size for reporting, and returning parts simply decrements
-/// `reservedQuantity`.
+/// There is no stored "reserved" counter. Parts go back on the shelf when a lab
+/// period ends, so availability only means anything within one session and is
+/// always derived:
+///
+///   available(part, date, slot) = totalQuantity
+///                               − SUM(BookingComponent.quantity)
+///                                 over CONFIRMED bookings in that date + slot
+///
+/// See plans/13-per-slot-stock.md.
 model Component {
-  id               String   @id @default(cuid())
-  name             String   @unique
-  sku              String?  @unique
-  description      String?
-  imageUrl         String?
-  totalQuantity    Int      @default(0)
-  reservedQuantity Int      @default(0)
-  isActive         Boolean  @default(true)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  id            String   @id @default(cuid())
+  name          String   @unique
+  sku           String?  @unique
+  description   String?
+  imageUrl      String?
+  /// How many of this part the lab owns.
+  totalQuantity Int      @default(0)
+  /// Ceiling on how many one group may take in a single booking.
+  maxPerBooking Int      @default(1)
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   bookingItems BookingComponent[]
 

@@ -30,7 +30,12 @@ import type {
   OverviewStats,
   SlotUtilisationRow,
 } from '../schemas/report.schema';
-import type { SlotAvailability, TimeSlot, UpdateSlotInput } from '../schemas/slot.schema';
+import type {
+  CreateSlotInput,
+  SlotAvailability,
+  TimeSlot,
+  UpdateSlotInput,
+} from '../schemas/slot.schema';
 import type { UploadSignature } from '../schemas/upload.schema';
 import type { ListUsersQuery, UpdateProfileInput, UpdateUserRoleInput, User } from '../schemas/user.schema';
 import type { HttpClient } from './http-client';
@@ -55,7 +60,9 @@ const slotEndpoints = (http: HttpClient) => ({
   list: () => http.get<TimeSlot[]>('/slots', { public: true }),
   availability: (date?: string) =>
     http.get<SlotAvailability[]>('/slots/availability', { query: { date }, public: true }),
+  create: (input: CreateSlotInput) => http.post<TimeSlot>('/slots', input),
   update: (id: string, input: UpdateSlotInput) => http.patch<TimeSlot>(`/slots/${id}`, input),
+  remove: (id: string) => http.delete<void>(`/slots/${id}`),
 });
 
 const componentEndpoints = (http: HttpClient) => ({

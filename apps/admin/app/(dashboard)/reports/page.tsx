@@ -1,6 +1,6 @@
 'use client';
 
-import type { ExportQuery } from '@arduino-lab/contracts';
+import type { ComponentUsageRow, ExportQuery } from '@arduino-lab/contracts';
 import {
   Button,
   Card,
@@ -130,10 +130,10 @@ export default function ReportsPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>المكوّن</TableHead>
-                    <TableHead className="w-24">الكلية</TableHead>
-                    <TableHead className="w-24">المحجوز</TableHead>
-                    <TableHead className="w-24">المتاح</TableHead>
-                    <TableHead className="w-36">الحالة</TableHead>
+                    <TableHead className="w-32">الكمية بالمعمل</TableHead>
+                    <TableHead className="w-36">الحد لكل مجموعة</TableHead>
+                    <TableHead className="w-36">أعلى طلب في فترة</TableHead>
+                    <TableHead className="w-36">الحالة عند الذروة</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -141,12 +141,12 @@ export default function ReportsPage() {
                     <TableRow key={row.componentId}>
                       <TableCell className="font-medium">{row.name}</TableCell>
                       <TableCell className="tabular-nums">{row.totalQuantity}</TableCell>
-                      <TableCell className="tabular-nums">{row.currentlyReserved}</TableCell>
+                      <TableCell className="tabular-nums">{row.maxPerBooking}</TableCell>
                       <TableCell className="font-semibold tabular-nums">
-                        {row.availableQuantity}
+                        {row.peakSessionDemand}
                       </TableCell>
                       <TableCell>
-                        <StockBadge status={toStatus(row.availableQuantity, row.totalQuantity)} />
+                        <StockBadge status={toPressureStatus(row)} />
                       </TableCell>
                     </TableRow>
                   ))}
@@ -160,7 +160,7 @@ export default function ReportsPage() {
   );
 }
 
-function UsageTable({ rows }: { rows: { componentId: string; name: string; timesRequested: number; totalQuantityRequested: number; availableQuantity: number }[] }) {
+function UsageTable({ rows }: { rows: ComponentUsageRow[] }) {
   const requested = rows.filter((row) => row.timesRequested > 0);
 
   return (
@@ -171,7 +171,7 @@ function UsageTable({ rows }: { rows: { componentId: string; name: string; times
             <TableHead>المكوّن</TableHead>
             <TableHead className="w-32">مرات الطلب</TableHead>
             <TableHead className="w-36">إجمالي الكمية</TableHead>
-            <TableHead className="w-24">المتاح</TableHead>
+            <TableHead className="w-36">أعلى طلب في فترة</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -180,7 +180,7 @@ function UsageTable({ rows }: { rows: { componentId: string; name: string; times
               <TableCell className="font-medium">{row.name}</TableCell>
               <TableCell className="tabular-nums">{row.timesRequested}</TableCell>
               <TableCell className="tabular-nums">{row.totalQuantityRequested}</TableCell>
-              <TableCell className="tabular-nums">{row.availableQuantity}</TableCell>
+              <TableCell className="tabular-nums">{row.peakSessionDemand}</TableCell>
             </TableRow>
           ))}
         </TableBody>
@@ -211,8 +211,16 @@ function ExportButton({ query }: { query: ExportQuery }) {
   );
 }
 
-function toStatus(available: number, total: number): 'available' | 'low' | 'out' {
-  if (available <= 0) return 'out';
-  if (total > 0 && available / total <= 0.25) return 'low';
+/**
+ * How tight a component got in its busiest session — the restocking signal now
+ * that stock resets each period and a single "available" number is meaningless.
+ */
+function toPressureStatus(row: {
+  totalQuantity: number;
+  peakSessionDemand: number;
+}): 'available' | 'low' | 'out' {
+  const spare = row.totalQuantity - row.peakSessionDemand;
+  if (spare <= 0) return 'out';
+  if (row.totalQuantity > 0 && spare / row.totalQuantity <= 0.25) return 'low';
   return 'available';
 }

@@ -29,7 +29,7 @@ import {
   nextBookingNumber,
   readOccupancy,
 } from './slot-lock.helper';
-import { reserveComponents } from './stock.helper';
+import { assertComponentsAvailable } from './stock.helper';
 
 /**
  * Bookings queue behind a slot-level row lock, so a burst of students competing
@@ -76,7 +76,10 @@ export class BookingsService {
       assertSlotHasRoom(slot, occupancy);
       assertGroupNumberFree(occupancy);
 
-      await reserveComponents(tx, input.components);
+      await assertComponentsAvailable(tx, input.components, {
+        bookingDate,
+        timeSlotId: slot.id,
+      });
 
       return tx.booking.create({
         data: {

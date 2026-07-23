@@ -124,9 +124,12 @@ describe('booking concurrency', () => {
     const accepted = responses.filter((r) => r.status === 201).length;
     expect(accepted).toBe(1);
 
-    const row = await ctx.prisma.component.findUniqueOrThrow({ where: { id: scarce.id } });
-    expect(row.reservedQuantity).toBe(1);
-    expect(row.reservedQuantity).toBeLessThanOrEqual(row.totalQuantity);
+    // Stock is derived, so the proof is in the bookings themselves.
+    const taken = await ctx.prisma.bookingComponent.aggregate({
+      where: { componentId: scarce.id, booking: { status: 'CONFIRMED' } },
+      _sum: { quantity: true },
+    });
+    expect(taken._sum.quantity).toBe(1);
   });
 
   it('rolls back the whole booking when one component is short', async () => {
@@ -134,10 +137,10 @@ describe('booking concurrency', () => {
     const slot = slots[2] as { id: string };
 
     const plentiful = await ctx.prisma.component.create({
-      data: { name: `E2E ${runId} rollback-ok`, totalQuantity: 50 },
+      data: { name: `E2E ${runId} rollback-ok`, totalQuantity: 50, maxPerBooking: 10 },
     });
     const empty = await ctx.prisma.component.create({
-      data: { name: `E2E ${runId} rollback-short`, totalQuantity: 1 },
+      data: { name: `E2E ${runId} rollback-short`, totalQuantity: 1, maxPerBooking: 10 },
     });
 
     const user = await createUserWithToken(ctx.prisma, {
@@ -160,11 +163,11 @@ describe('booking concurrency', () => {
     expect(response.status).toBe(409);
     expect(((await response.json()) as { code: string }).code).toBe('COMPONENT_OUT_OF_STOCK');
 
-    // The available component must not have been touched, and no booking row created.
-    const plentifulRow = await ctx.prisma.component.findUniqueOrThrow({
-      where: { id: plentiful.id },
+    // Nothing was written for either component, and no booking row was created.
+    const lines = await ctx.prisma.bookingComponent.count({
+      where: { componentId: { in: [plentiful.id, empty.id] } },
     });
-    expect(plentifulRow.reservedQuantity).toBe(0);
+    expect(lines).toBe(0);
 
     const created = await ctx.prisma.booking.count({ where: { groupNumber: 300 } });
     expect(created).toBe(0);
