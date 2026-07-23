@@ -7,7 +7,6 @@ import type {
   LoginInput,
   RegisterInput,
   ResetPasswordInput,
-  VerifyEmailInput,
 } from '../schemas/auth.schema';
 import type {
   Booking,
@@ -38,12 +37,8 @@ import type { HttpClient } from './http-client';
 
 const authEndpoints = (http: HttpClient) => ({
   register: (input: RegisterInput) =>
-    http.post<{ message: string }>('/auth/register', input, { public: true }),
+    http.post<AuthTokens>('/auth/register', input, { public: true }),
   login: (input: LoginInput) => http.post<AuthTokens>('/auth/login', input, { public: true }),
-  verifyEmail: (input: VerifyEmailInput) =>
-    http.post<{ message: string }>('/auth/verify-email', input, { public: true }),
-  resendVerification: (email: string) =>
-    http.post<{ message: string }>('/auth/resend-verification', { email }, { public: true }),
   forgotPassword: (input: ForgotPasswordInput) =>
     http.post<{ message: string }>('/auth/forgot-password', input, { public: true }),
   resetPassword: (input: ResetPasswordInput) =>

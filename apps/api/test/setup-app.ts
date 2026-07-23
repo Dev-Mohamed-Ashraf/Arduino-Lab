@@ -49,7 +49,6 @@ export async function createUserWithToken(
       passwordHash: await hash('Test@12345', ARGON2_OPTIONS),
       fullName: options.fullName ?? 'Test User',
       role: options.role ?? Role.STUDENT,
-      emailVerifiedAt: new Date(),
     },
   });
 

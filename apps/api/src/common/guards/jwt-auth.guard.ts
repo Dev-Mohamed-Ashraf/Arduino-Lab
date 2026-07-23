@@ -56,18 +56,13 @@ export class JwtAuthGuard implements CanActivate {
 
       const user = await this.prisma.user.findUnique({
         where: { id: payload.sub },
-        select: { id: true, email: true, role: true, isActive: true, emailVerifiedAt: true },
+        select: { id: true, email: true, role: true, isActive: true },
       });
 
       if (!user) throw new UnauthorizedError();
       if (!user.isActive) throw new UnauthorizedError(ERROR_CODES.ACCOUNT_DISABLED);
 
-      return {
-        id: user.id,
-        email: user.email,
-        role: user.role,
-        isEmailVerified: user.emailVerifiedAt !== null,
-      };
+      return { id: user.id, email: user.email, role: user.role };
     } catch (error) {
       // A stale token on a public route just means "treat this as anonymous".
       if (isPublic) return undefined;

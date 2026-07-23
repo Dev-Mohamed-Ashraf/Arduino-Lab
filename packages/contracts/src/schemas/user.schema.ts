@@ -16,7 +16,6 @@ export const userSchema = z.object({
   studentCode: z.string().nullable(),
   phone: z.string().nullable(),
   role: roleSchema,
-  emailVerifiedAt: z.string().nullable(),
   isActive: z.boolean(),
   bookingsCount: z.number().int(),
   createdAt: z.string(),

@@ -43,7 +43,6 @@ export class UsersService {
           studentCode: true,
           phone: true,
           role: true,
-          emailVerifiedAt: true,
           isActive: true,
           createdAt: true,
           _count: { select: { ownedBookings: true } },
@@ -78,7 +77,6 @@ export class UsersService {
         studentCode: true,
         phone: true,
         role: true,
-        emailVerifiedAt: true,
         isActive: true,
         createdAt: true,
         _count: { select: { ownedBookings: true } },
@@ -103,14 +101,12 @@ export class UsersService {
         studentCode: true,
         phone: true,
         role: true,
-        emailVerifiedAt: true,
         createdAt: true,
       },
     });
 
     return {
       ...user,
-      emailVerifiedAt: user.emailVerifiedAt?.toISOString() ?? null,
       createdAt: user.createdAt.toISOString(),
     };
   }
@@ -124,7 +120,6 @@ type UserRow = Prisma.UserGetPayload<{
     studentCode: true;
     phone: true;
     role: true;
-    emailVerifiedAt: true;
     isActive: true;
     createdAt: true;
     _count: { select: { ownedBookings: true } };
@@ -139,7 +134,6 @@ function toUserDto(row: UserRow): User {
     studentCode: row.studentCode,
     phone: row.phone,
     role: row.role,
-    emailVerifiedAt: row.emailVerifiedAt?.toISOString() ?? null,
     isActive: row.isActive,
     bookingsCount: row._count.ownedBookings,
     createdAt: row.createdAt.toISOString(),

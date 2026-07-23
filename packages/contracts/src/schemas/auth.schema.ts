@@ -50,8 +50,6 @@ export const loginSchema = z.object({
   password: z.string().min(1, 'كلمة المرور مطلوبة.'),
 });
 
-export const verifyEmailSchema = z.object({ token: z.string().min(1) });
-export const resendVerificationSchema = z.object({ email: emailSchema });
 export const forgotPasswordSchema = z.object({ email: emailSchema });
 
 export const resetPasswordSchema = z
@@ -81,7 +79,6 @@ export const currentUserSchema = z.object({
   studentCode: z.string().nullable(),
   phone: z.string().nullable(),
   role: roleSchema,
-  emailVerifiedAt: z.string().nullable(),
   createdAt: z.string(),
 });
 
@@ -94,7 +91,6 @@ export const accessTokenPayloadSchema = z.object({
 
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
-export type VerifyEmailInput = z.infer<typeof verifyEmailSchema>;
 export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
 export type RefreshTokenInput = z.infer<typeof refreshTokenSchema>;

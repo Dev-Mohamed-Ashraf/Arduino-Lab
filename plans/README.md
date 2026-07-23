@@ -29,6 +29,7 @@
 | 09 | [Print / Export](./09-print-export.md) | ✅ done | 2026-07-23 | 2026-07-23 |
 | 10 | [Deployment](./10-deployment.md) | ✅ done (live) | 2026-07-23 | 2026-07-23 |
 | 11 | [Hardening + Tests](./11-hardening-tests.md) | ✅ done | 2026-07-23 | 2026-07-23 |
+| 12 | [إلغاء تأكيد الإيميل](./12-remove-email-verification.md) | ✅ done | 2026-07-23 | 2026-07-23 |
 
 ## ترتيب التنفيذ
 

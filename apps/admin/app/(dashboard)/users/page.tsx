@@ -94,7 +94,6 @@ function UsersContent() {
                   <TableHead>الاسم</TableHead>
                   <TableHead>البريد الإلكتروني</TableHead>
                   <TableHead className="w-24">الحجوزات</TableHead>
-                  <TableHead className="w-28">التأكيد</TableHead>
                   <TableHead className="w-28">التسجيل</TableHead>
                   <TableHead className="w-48">الدور</TableHead>
                 </TableRow>
@@ -107,11 +106,6 @@ function UsersContent() {
                       {user.email}
                     </TableCell>
                     <TableCell className="tabular-nums">{user.bookingsCount}</TableCell>
-                    <TableCell>
-                      <Badge variant={user.emailVerifiedAt ? 'success' : 'warning'}>
-                        {user.emailVerifiedAt ? 'مؤكد' : 'غير مؤكد'}
-                      </Badge>
-                    </TableCell>
                     <TableCell className="whitespace-nowrap text-xs">
                       {formatShortDate(user.createdAt.slice(0, 10))}
                     </TableCell>
@@ -138,9 +132,6 @@ function UsersContent() {
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <Badge variant={user.emailVerifiedAt ? 'success' : 'warning'}>
-                    {user.emailVerifiedAt ? 'مؤكد' : 'غير مؤكد'}
-                  </Badge>
                   <Badge variant="outline" className="tabular-nums">
                     {user.bookingsCount} حجز
                   </Badge>

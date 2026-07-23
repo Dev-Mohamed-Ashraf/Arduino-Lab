@@ -45,9 +45,7 @@
       "PowerShell(Remove-Item -Recurse -Force:*)",
       "PowerShell(git reset --hard:*)",
       "PowerShell(pnpm db:reset:*)",
-      "PowerShell(npx prisma migrate reset:*)",
-      "Read(./.env)",
-      "Read(./.env.*)"
+      "PowerShell(npx prisma migrate reset:*)"
     ]
   }
 }

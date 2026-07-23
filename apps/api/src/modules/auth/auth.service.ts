@@ -12,6 +12,7 @@ import { Role } from '@prisma/client';
 import { AppConfigService } from '../../config/app-config.service';
 import {
   BadRequestError,
+  ConflictError,
   ForbiddenError,
   UnauthorizedError,
 } from '../../common/errors/app.exception';
@@ -37,21 +38,25 @@ export class AuthService {
     private readonly config: AppConfigService,
   ) {}
 
-  async register(input: RegisterInput): Promise<{ message: string }> {
+  /**
+   * Creates an account and signs it in immediately.
+   *
+   * There is no email confirmation step, so the response has to say plainly
+   * whether the address was already taken — otherwise the caller cannot tell
+   * why they were not signed in. That makes registration enumerable, which is
+   * an accepted trade-off here; login itself still reveals nothing.
+   * See plans/12-remove-email-verification.md.
+   */
+  async register(input: RegisterInput, context: RequestContext): Promise<AuthTokens> {
     this.assertAllowedDomain(input.email);
 
     const existing = await this.prisma.user.findUnique({
       where: { email: input.email },
-      select: { id: true, emailVerifiedAt: true, fullName: true },
+      select: { id: true },
     });
 
-    // Same response either way — a different message would let an attacker
-    // enumerate which university addresses have accounts.
     if (existing) {
-      if (!existing.emailVerifiedAt) {
-        await this.dispatchVerification(existing.id, input.email, existing.fullName);
-      }
-      return NEUTRAL_RESPONSE;
+      throw new ConflictError(ERROR_CODES.EMAIL_ALREADY_REGISTERED);
     }
 
     const user = await this.prisma.user.create({
@@ -63,48 +68,11 @@ export class AuthService {
         phone: input.phone || null,
         role: Role.STUDENT,
       },
-      select: { id: true, email: true, fullName: true },
+      select: { id: true, email: true, role: true },
     });
 
-    await this.dispatchVerification(user.id, user.email, user.fullName);
-    return NEUTRAL_RESPONSE;
-  }
-
-  async verifyEmail(rawToken: string): Promise<{ message: string }> {
-    const token = await this.prisma.emailVerificationToken.findUnique({
-      where: { tokenHash: hashToken(rawToken) },
-      include: { user: { select: { id: true, emailVerifiedAt: true } } },
-    });
-
-    if (!token) throw new BadRequestError(ERROR_CODES.INVALID_TOKEN);
-    if (token.usedAt) throw new BadRequestError(ERROR_CODES.TOKEN_ALREADY_USED);
-    if (token.expiresAt < new Date()) throw new BadRequestError(ERROR_CODES.TOKEN_EXPIRED);
-
-    await this.prisma.$transaction([
-      this.prisma.emailVerificationToken.update({
-        where: { id: token.id },
-        data: { usedAt: new Date() },
-      }),
-      this.prisma.user.update({
-        where: { id: token.userId },
-        data: { emailVerifiedAt: token.user.emailVerifiedAt ?? new Date() },
-      }),
-    ]);
-
-    return { message: 'تم تأكيد بريدك الإلكتروني. يمكنك تسجيل الدخول الآن.' };
-  }
-
-  async resendVerification(email: string): Promise<{ message: string }> {
-    const user = await this.prisma.user.findUnique({
-      where: { email },
-      select: { id: true, email: true, fullName: true, emailVerifiedAt: true },
-    });
-
-    if (user && !user.emailVerifiedAt) {
-      await this.dispatchVerification(user.id, user.email, user.fullName);
-    }
-
-    return NEUTRAL_RESPONSE;
+    this.logger.log(`Account created for ${user.email}`);
+    return this.tokens.issueTokens(user, context);
   }
 
   async login(input: LoginInput, context: RequestContext): Promise<AuthTokens> {
@@ -116,7 +84,6 @@ export class AuthService {
         role: true,
         passwordHash: true,
         isActive: true,
-        emailVerifiedAt: true,
       },
     });
 
@@ -131,7 +98,6 @@ export class AuthService {
     }
 
     if (!user.isActive) throw new ForbiddenError(ERROR_CODES.ACCOUNT_DISABLED);
-    if (!user.emailVerifiedAt) throw new ForbiddenError(ERROR_CODES.EMAIL_NOT_VERIFIED);
 
     return this.tokens.issueTokens(user, context);
   }
@@ -193,16 +159,11 @@ export class AuthService {
         studentCode: true,
         phone: true,
         role: true,
-        emailVerifiedAt: true,
         createdAt: true,
       },
     });
 
-    return {
-      ...user,
-      emailVerifiedAt: user.emailVerifiedAt?.toISOString() ?? null,
-      createdAt: user.createdAt.toISOString(),
-    };
+    return { ...user, createdAt: user.createdAt.toISOString() };
   }
 
   private assertAllowedDomain(email: string): void {
@@ -216,11 +177,6 @@ export class AuthService {
     }
   }
 
-  private async dispatchVerification(userId: string, email: string, fullName: string): Promise<void> {
-    const token = await this.tokens.createEmailVerificationToken(userId);
-    await this.mail.sendVerifyEmail(email, fullName, token);
-    this.logger.log(`Verification email dispatched for ${email}`);
-  }
 }
 
 /** A real argon2id digest of a random string, used only to equalise timing. */

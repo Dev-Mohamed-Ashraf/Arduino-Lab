@@ -9,7 +9,6 @@ import { UnauthorizedError } from '../../common/errors/app.exception';
 import { PrismaService } from '../../common/prisma/prisma.service';
 
 const REFRESH_TOKEN_BYTES = 48;
-const VERIFICATION_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
 const PASSWORD_RESET_TTL_MS = 60 * 60 * 1000;
 
 export interface TokenSubject {
@@ -108,19 +107,6 @@ export class TokenService {
       where: { userId, revokedAt: null },
       data: { revokedAt: new Date() },
     });
-  }
-
-  /** Creates a single-use email verification token and returns the raw value. */
-  async createEmailVerificationToken(userId: string): Promise<string> {
-    const raw = randomBytes(32).toString('base64url');
-    await this.prisma.emailVerificationToken.create({
-      data: {
-        userId,
-        tokenHash: hashToken(raw),
-        expiresAt: new Date(Date.now() + VERIFICATION_TOKEN_TTL_MS),
-      },
-    });
-    return raw;
   }
 
   async createPasswordResetToken(userId: string): Promise<string> {

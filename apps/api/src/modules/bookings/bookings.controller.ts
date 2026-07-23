@@ -27,7 +27,6 @@ import {
 
 import { CurrentUser, type RequestUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
-import { EmailVerifiedGuard } from '../../common/guards/email-verified.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { zodBody, zodQuery, ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { BookingsAdminService } from './bookings-admin.service';
@@ -44,7 +43,6 @@ export class BookingsController {
   ) {}
 
   @Post()
-  @UseGuards(EmailVerifiedGuard)
   // Per user, not per IP — see UserThrottlerGuard. Generous enough for a teaching
   // assistant registering a full session of groups back to back.
   @Throttle({ default: { limit: 30, ttl: 3_600_000 } })

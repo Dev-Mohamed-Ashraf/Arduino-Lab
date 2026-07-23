@@ -61,18 +61,6 @@ function renderLayout({ title, greeting, body, action, footnote }: Layout): stri
 </html>`;
 }
 
-export function verifyEmailTemplate(fullName: string, url: string) {
-  return {
-    subject: 'تأكيد بريدك الإلكتروني — معمل الأردوينو',
-    html: renderLayout({
-      title: 'تأكيد البريد الإلكتروني',
-      greeting: `مرحبًا ${fullName}،`,
-      body: ['اضغط على الزر التالي لتأكيد بريدك الإلكتروني وتفعيل حسابك في نظام حجز معمل الأردوينو.'],
-      action: { label: 'تأكيد البريد الإلكتروني', url },
-      footnote: 'صلاحية الرابط 24 ساعة. إذا لم تقم بإنشاء هذا الحساب، تجاهل الرسالة.',
-    }),
-  };
-}
 
 export function resetPasswordTemplate(fullName: string, url: string) {
   return {

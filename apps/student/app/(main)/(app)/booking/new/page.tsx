@@ -8,7 +8,7 @@ export const metadata: Metadata = { title: 'حجز موعد' };
 
 export default function NewBookingPage() {
   return (
-    <RequireAuth requireVerified>
+    <RequireAuth>
       <div className="mx-auto max-w-3xl space-y-6 px-4 py-8">
         <PageHeader
           title="حجز موعد في المعمل"

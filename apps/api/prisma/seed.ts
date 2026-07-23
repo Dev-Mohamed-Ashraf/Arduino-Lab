@@ -52,7 +52,6 @@ async function seedAdmin(): Promise<void> {
       passwordHash,
       fullName,
       role: Role.ADMIN,
-      emailVerifiedAt: new Date(),
     },
   });
   console.log(`✓ admin user ${email}`);

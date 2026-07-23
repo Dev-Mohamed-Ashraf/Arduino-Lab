@@ -6,8 +6,7 @@ import {
   bookingCancelledTemplate,
   bookingConfirmedTemplate,
   resetPasswordTemplate,
-  verifyEmailTemplate,
-  type BookingMailData,
+    type BookingMailData,
 } from './mail.templates';
 
 /**
@@ -27,10 +26,6 @@ export class MailService {
     this.resend = config.isMailConfigured ? new Resend(config.mail.apiKey) : null;
   }
 
-  async sendVerifyEmail(to: string, fullName: string, token: string): Promise<void> {
-    const url = `${this.config.studentAppUrl}/verify-email?token=${encodeURIComponent(token)}`;
-    await this.send(to, verifyEmailTemplate(fullName, url));
-  }
 
   async sendPasswordReset(to: string, fullName: string, token: string): Promise<void> {
     const url = `${this.config.studentAppUrl}/reset-password?token=${encodeURIComponent(token)}`;

@@ -40,18 +40,43 @@ describe('auth flow', () => {
     expect((result.body as { code: string }).code).toBe('EMAIL_DOMAIN_NOT_ALLOWED');
   });
 
-  it('refuses login before the email is verified, then allows it after', async () => {
-    await post('/auth/register', { email, password, confirmPassword: password, fullName: 'Tester' });
+  it('signs the new account in straight away — no confirmation step', async () => {
+    const result = await post('/auth/register', {
+      email,
+      password,
+      confirmPassword: password,
+      fullName: 'Tester',
+    });
 
-    const beforeVerify = await post('/auth/login', { email, password });
-    expect(beforeVerify.status).toBe(403);
-    expect((beforeVerify.body as { code: string }).code).toBe('EMAIL_NOT_VERIFIED');
+    expect(result.status).toBe(201);
+    const tokens = result.body as { accessToken?: string; refreshToken?: string };
+    expect(tokens.accessToken).toBeTruthy();
+    expect(tokens.refreshToken).toBeTruthy();
 
-    await ctx.prisma.user.update({ where: { email }, data: { emailVerifiedAt: new Date() } });
+    // The returned token must actually work against a protected route.
+    const me = await fetch(`${ctx.baseUrl}/auth/me`, {
+      headers: { Authorization: `Bearer ${tokens.accessToken}` },
+    });
+    expect(me.status).toBe(200);
+    expect(((await me.json()) as { email: string }).email).toBe(email);
+  });
 
-    const afterVerify = await post('/auth/login', { email, password });
-    expect(afterVerify.status).toBe(200);
-    expect((afterVerify.body as { accessToken?: string }).accessToken).toBeTruthy();
+  it('rejects a duplicate email instead of silently succeeding', async () => {
+    const duplicate = await post('/auth/register', {
+      email,
+      password,
+      confirmPassword: password,
+      fullName: 'Tester Again',
+    });
+
+    expect(duplicate.status).toBe(409);
+    expect((duplicate.body as { code: string }).code).toBe('EMAIL_ALREADY_REGISTERED');
+  });
+
+  it('accepts login with the registered credentials', async () => {
+    const result = await post('/auth/login', { email, password });
+    expect(result.status).toBe(200);
+    expect((result.body as { accessToken?: string }).accessToken).toBeTruthy();
   });
 
   it('rotates refresh tokens and revokes the family on reuse', async () => {

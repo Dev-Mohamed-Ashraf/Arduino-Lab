@@ -1,21 +1,23 @@
 'use client';
 
 import { registerSchema, type RegisterInput } from '@arduino-lab/contracts';
-import { Alert, AlertDescription, AlertTitle, Button } from '@arduino-lab/ui';
+import { Alert, AlertDescription, Button } from '@arduino-lab/ui';
+import { toErrorMessage, useAuth } from '@arduino-lab/web';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { AlertCircle, MailCheck } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import * as React from 'react';
 import { useForm } from 'react-hook-form';
 
 import { AuthCard } from '@/components/auth/auth-card';
 import { FormField } from '@/components/auth/form-field';
-import { api } from '@/lib/api';
-import { toErrorMessage } from '@arduino-lab/web';
+import { api, tokenStore } from '@/lib/api';
 
 export default function RegisterPage() {
+  const router = useRouter();
+  const { refreshUser } = useAuth();
   const [formError, setFormError] = React.useState<string | null>(null);
-  const [sentTo, setSentTo] = React.useState<string | null>(null);
 
   const {
     register,
@@ -26,44 +28,21 @@ export default function RegisterPage() {
   const onSubmit = handleSubmit(async (values) => {
     setFormError(null);
     try {
-      await api.auth.register(values);
-      setSentTo(values.email);
+      // There is no confirmation step: the API signs the new account in and
+      // returns tokens directly. See plans/12-remove-email-verification.md.
+      tokenStore.setTokens(await api.auth.register(values));
+      await refreshUser();
+      router.push('/booking/new');
+      router.refresh();
     } catch (error) {
       setFormError(toErrorMessage(error));
     }
   });
 
-  if (sentTo) {
-    return (
-      <AuthCard
-        title="تحقّق من بريدك الإلكتروني"
-        footer={
-          <Link href="/login" className="text-primary font-medium hover:underline">
-            العودة لتسجيل الدخول
-          </Link>
-        }
-      >
-        <Alert variant="success">
-          <MailCheck aria-hidden />
-          <AlertTitle>أرسلنا رسالة تأكيد</AlertTitle>
-          <AlertDescription>
-            <span>
-              إذا كان <span dir="ltr">{sentTo}</span> مسجّلًا لدينا فستصلك رسالة خلال دقائق. افتح
-              الرابط داخلها لتفعيل حسابك.
-            </span>
-            <span className="text-muted-foreground">
-              لم تصلك؟ راجع مجلد الرسائل غير المرغوب فيها.
-            </span>
-          </AlertDescription>
-        </Alert>
-      </AuthCard>
-    );
-  }
-
   return (
     <AuthCard
       title="إنشاء حساب"
-      description="التسجيل متاح بالبريد الجامعي فقط."
+      description="سجّل بياناتك وابدأ الحجز مباشرة."
       footer={
         <>
           لديك حساب بالفعل؟{' '}
@@ -90,7 +69,7 @@ export default function RegisterPage() {
         />
 
         <FormField
-          label="البريد الإلكتروني الجامعي"
+          label="البريد الإلكتروني"
           type="email"
           autoComplete="email"
           dir="ltr"
@@ -141,7 +120,7 @@ export default function RegisterPage() {
         />
 
         <Button type="submit" className="w-full" size="lg" isLoading={isSubmitting}>
-          إنشاء الحساب
+          إنشاء الحساب والبدء
         </Button>
       </form>
     </AuthCard>

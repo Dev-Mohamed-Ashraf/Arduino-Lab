@@ -37,42 +37,27 @@ enum AuditAction {
 //  Identity
 // ─────────────────────────────────────────────────────────────
 
+/// Accounts are usable the moment they are created — there is no email
+/// confirmation step. See plans/12-remove-email-verification.md.
 model User {
-  id              String    @id @default(cuid())
-  email           String    @unique
-  passwordHash    String
-  fullName        String
-  studentCode     String?
-  phone           String?
-  role            Role      @default(STUDENT)
-  emailVerifiedAt DateTime?
-  isActive        Boolean   @default(true)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  fullName     String
+  studentCode  String?
+  phone        String?
+  role         Role     @default(STUDENT)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  verificationTokens EmailVerificationToken[]
   passwordResetTokens PasswordResetToken[]
-  refreshTokens      RefreshToken[]
-  ownedBookings      Booking[]                @relation("BookingOwner")
-  createdBookings    Booking[]                @relation("BookingCreator")
-  auditLogs          AuditLog[]
+  refreshTokens       RefreshToken[]
+  ownedBookings       Booking[]            @relation("BookingOwner")
+  createdBookings     Booking[]            @relation("BookingCreator")
+  auditLogs           AuditLog[]
 
   @@index([role])
-}
-
-/// Single-use token emailed to confirm a university address.
-model EmailVerificationToken {
-  id        String    @id @default(cuid())
-  userId    String
-  tokenHash String    @unique
-  expiresAt DateTime
-  usedAt    DateTime?
-  createdAt DateTime  @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@index([expiresAt])
 }
 
 model PasswordResetToken {

@@ -6,9 +6,7 @@ import {
   loginSchema,
   refreshTokenSchema,
   registerSchema,
-  resendVerificationSchema,
   resetPasswordSchema,
-  verifyEmailSchema,
   type AuthTokens,
   type CurrentUser,
   type ForgotPasswordInput,
@@ -16,7 +14,6 @@ import {
   type RefreshTokenInput,
   type RegisterInput,
   type ResetPasswordInput,
-  type VerifyEmailInput,
 } from '@arduino-lab/contracts';
 
 import { CurrentUser as User, type RequestUser } from '../../common/decorators/current-user.decorator';
@@ -37,26 +34,12 @@ export class AuthController {
   @Public()
   @Post('register')
   @Throttle(STRICT_THROTTLE)
-  @ApiOperation({ summary: 'Register with a university email address' })
-  register(@Body(zodBody(registerSchema)) input: RegisterInput) {
-    return this.auth.register(input);
-  }
-
-  @Public()
-  @Post('verify-email')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Consume an email verification token' })
-  verifyEmail(@Body(zodBody(verifyEmailSchema)) input: VerifyEmailInput) {
-    return this.auth.verifyEmail(input.token);
-  }
-
-  @Public()
-  @Post('resend-verification')
-  @Throttle(STRICT_THROTTLE)
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Send the verification email again' })
-  resendVerification(@Body(zodBody(resendVerificationSchema)) input: ForgotPasswordInput) {
-    return this.auth.resendVerification(input.email);
+  @ApiOperation({ summary: 'Create an account and sign in immediately' })
+  register(
+    @Body(zodBody(registerSchema)) input: RegisterInput,
+    @Req() request: Request,
+  ): Promise<AuthTokens> {
+    return this.auth.register(input, requestContext(request));
   }
 
   @Public()
