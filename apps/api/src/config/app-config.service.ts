@@ -51,7 +51,9 @@ export class AppConfigService {
   }
 
   get corsOrigins(): string[] {
-    return [this.get('STUDENT_APP_URL'), this.get('ADMIN_APP_URL')];
+    // Empty entries (front ends not yet deployed) are dropped so CORS never
+    // ends up allowing an empty origin.
+    return [this.get('STUDENT_APP_URL'), this.get('ADMIN_APP_URL')].filter(Boolean);
   }
 
   get studentAppUrl(): string {

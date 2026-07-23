@@ -22,8 +22,11 @@ export const envSchema = z.object({
   /** Comma-separated list; students may only register with one of these domains. */
   ALLOWED_EMAIL_DOMAINS: z.string().min(1),
 
-  STUDENT_APP_URL: z.string().url(),
-  ADMIN_APP_URL: z.string().url(),
+  // Optional so the API can boot before the front ends exist — they are hosted
+  // separately and cannot be deployed until this service has a URL to point at.
+  // Until each is set, its origin is simply absent from the CORS allow-list.
+  STUDENT_APP_URL: z.string().url().or(z.literal('')).default(''),
+  ADMIN_APP_URL: z.string().url().or(z.literal('')).default(''),
 
   // Optional until the accounts are provisioned; the owning module degrades
   // gracefully and logs instead of failing the request.
