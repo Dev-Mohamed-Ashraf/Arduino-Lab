@@ -7,7 +7,10 @@
     // required even though the schemas themselves are environment-agnostic.
     "lib": ["ES2023", "DOM"],
     "outDir": "dist",
-    "rootDir": "src"
+    "rootDir": "src",
+    // Kept inside dist so `rimraf dist` also resets the incremental build state;
+    // otherwise a stale tsbuildinfo makes tsc emit nothing after a dist wipe.
+    "tsBuildInfoFile": "dist/.tsbuildinfo"
   },
   "include": ["src/**/*"]
 }

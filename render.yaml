@@ -12,10 +12,14 @@ services:
     # --prod=false forces devDependencies even though NODE_ENV=production is set
     # below: prisma, the Nest CLI and typescript are all devDependencies needed
     # to build. Production runs the compiled dist, so runtime stays lean.
+    # @arduino-lab/contracts ships TypeScript and must be compiled to dist/
+    # before the API can resolve it. Turbo builds it and any other workspace
+    # dependency in the right order via the api build's `^build` dependsOn.
     buildCommand: >-
       corepack enable &&
       pnpm install --frozen-lockfile --prod=false &&
       pnpm --filter @arduino-lab/api db:generate &&
+      pnpm --filter @arduino-lab/contracts build &&
       pnpm --filter @arduino-lab/api build &&
       pnpm --filter @arduino-lab/api db:deploy
     startCommand: node apps/api/dist/main.js
